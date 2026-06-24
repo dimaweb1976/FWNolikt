@@ -1,0 +1,1614 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="IE_Manager" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+Public Const _UpItem     = 1
+Public Const _DownItem   = 2
+Public Const _SelQuery   = 1
+Public Const _UpdQuery   = 2
+Public Const _Tables     = 1
+Public Const _Procedures = 2
+Public Const _MaxInteger = 32767
+Public Const _StartPage  = 1
+Public Const _PagesCount = 3
+Public Const _Input      = 0
+Public Const _Output     = 1
+
+Public Const _MaxBlankRowsCount = 100
+
+Dim Libraries
+Dim Dlg                 As Object
+Dim DlgUserCredintials  As Object
+
+Dim cbxUseRange         As Object
+Dim lstTableFields      As Object
+Dim cmbTableNames       As Object
+Dim cmbOperates         As Object
+Dim lblSelectTable      As Object
+Dim lblTableFields      As Object
+Dim lstSelTableFields   As Object
+Dim lstColumnNames      As Object
+Dim lstSelColumnNames   As Object
+Dim lblSkipRows         As Object
+Dim edtSkipRows         As Object
+Dim edtText             As Object
+Dim lstTableFields      As Object
+Dim lstSelTableFields   As Object
+Dim btnAddValue         As Object
+Dim btnDelValue         As Object
+Dim btnAddNull          As Object
+Dim btnImportToDB       As Object
+Dim pnlInfo             As Object
+Dim lblInfo             As Object
+Dim lblRange            As Object
+Dim pgsInfo             As Object
+Dim btnPrev             As Object
+Dim btnNext             As Object
+Dim lblColumn           As Object
+Dim cmbColumns          As Object
+
+Dim btnItemDown         As Object
+Dim btnItemUp           As Object
+Dim btnRemoveAllItems   As Object
+Dim btnRemoveSingleItem As Object
+Dim btnMoveAllItems     As Object
+Dim btnMoveSingleItem   As Object
+
+Dim btnColumnDown       As Object
+Dim btnColumnUp         As Object
+Dim btnRemoveAllColumns As Object
+Dim btnRemoveSelColumns As Object
+Dim btnMoveAllColumns   As Object
+Dim btnMoveSelColumns   As Object
+
+Dim Db                  As Object
+
+Dim Range               As Object
+Dim oFunction           As Object
+
+Dim OriginalList()      As String
+Dim ValuesArray()       As String
+Dim ColumnNames()       As String
+Dim SelColumnNames()    As String
+Dim Columns()           As Object
+Dim TableNames()        As String
+Dim Operates(2)         As String
+Dim FieldNames()        As String
+Dim SelFieldNames()     As String
+Dim InParams()          As String
+Dim OutParams()         As String
+
+Dim DataBaseName        As String
+Dim AutoCommit          As Boolean
+Dim Tablename           As String
+Dim Operate             As String
+Dim ParamTypeStr        As String
+Dim SkipRows            As Long
+Dim Range               As Object
+Dim Statement           As Object
+Dim ReturnValue         As Boolean
+Dim FetchRecords        As Long
+Dim ControlUpdating     As Boolean
+Dim ParatTypeStr        As String
+Dim ProgressStep        As Long 
+Dim MaxOutParamsIndex   As Long
+Dim MaxInParamsIndex    As Long
+Dim MaxRowIndex         As Long 
+Dim Result              As Boolean  
+
+
+Dim UserCredintials(2) As String
+
+Sub Main
+  Dim oSheet As Object
+
+  DataBaseName = &quot;&quot; 
+
+  oFunction = createUnoService(&quot;com.sun.star.sheet.FunctionAccess&quot;)
+  Range = thisComponent.getCurrentSelection.getRangeAddress
+
+  &apos; Reading user credintials from Sheet1.A1, Sheet1.A2
+  oSheet = ThisComponent.getSheets().getByIndex(0)
+  
+  UserCredintials(0) = oSheet.GetCellByPosition(0, 0).String
+  UserCredintials(1) = oSheet.GetCellByPosition(0, 1).String
+  UserCredintials(2) = oSheet.GetCellByPosition(0, 2).String
+  DataBaseName = UserCredintials(2) 
+
+  ConnectToDBMark:
+ 
+  If ( (UserCredintials(0) = &quot;&quot; and UserCredintials(1) = &quot;&quot;) or UserCredintials(2) = &quot;&quot;) Then
+    GoTo GetUserCredintialsMark 
+  End If
+ 
+  On Error GoTo DBErrorHandlingMark  
+    Db = connect_to_database(DataBaseName, UserCredintials(0), UserCredintials(1))
+    AutoCommit = Db.GetAutoCommit()
+    AutoCommit = false
+    Db.SetAutoCommit(AutoCommit)
+    Statement = db.createStatement
+    Statement.ResultSetType = com.sun.star.sdbc.ResultSetType.SCROLL_INSENSITIVE
+    
+  On Error GoTo DefaultErrorHandlingMark
+    StartDialog()
+
+    CloseDialog
+    Disconnect_from_database(Db)
+  Exit Sub
+  
+  DBErrorHandlingMark:
+    MsgBox &quot;Ошибка подключения к базе данных, проверьте имя пользователя и пароль&quot; &amp; chr(10) &amp; _
+           &quot;Error &quot; &amp; Err &amp; &quot;: &quot; &amp; Error$ &amp; &quot; (line : &quot; &amp; Erl &amp; &quot;)&quot;
+    Resume GetUserCredintialsMark
+    
+  GetUserCredintialsMark:
+    If InitializeDlgUserCredintials(UserCredintials()) Then    
+      GoTo ConnectToDBMark
+    Else
+      Exit Sub
+    End If    
+    
+  DefaultErrorHandlingMark:
+    MsgBox &quot;Error &quot; &amp; Err &amp; &quot;: &quot; &amp; Error$ &amp; &quot; (line : &quot; &amp; Erl &amp; &quot;)&quot;
+    Exit Sub    
+End Sub
+
+Sub LoadLibrary(LibraryName As String)
+    If not DialogLibraries.islibraryloaded(LibraryName) then 
+      DialogLibraries.LoadLibrary(LibraryName)
+    End If
+End Sub
+
+Sub InitializeListboxProcedures(SourceListbox as Object, TargetListbox as Object)
+  OriginalList()= ListBoxToStringList(SourceListbox)
+  ClearListBox(TargetListbox)
+End Sub
+
+Sub pnlTablesOnFocus
+  InitializeOriginalList(FieldNames())
+End Sub
+
+Sub pnlSheetsOnFocus
+  InitializeOriginalList(ColumnNames())
+End Sub
+
+Sub cbxUseRangeOnChange
+  if (cbxUseRange.State = 0) then
+    ToggleControlsByState(cbxUseRange.State)
+  else  
+    ToggleListboxControls(Dlg, True)
+  end if  
+End Sub
+
+Sub ToggleControlsByState(AState As Integer)
+  if (cbxUseRange.State = 0) then
+    edtSkipRows.Enable = AState 
+    lstColumnNames.Enable = AState 
+    btnRemoveAllColumns.Enable = AState
+    btnRemoveSelColumns.Enable = AState
+    btnMoveAllColumns.Enable = AState
+    btnMoveSelColumns.Enable = AState
+  end if  
+End Sub
+
+Sub cmbTableNamesOnChange
+  Tablename = GetSelectedItem(cmbTableNames)
+  ClearListBox(lstTableFields)
+  
+  Select Case Dlg.Model.Step
+  Case _Tables
+    FieldNames() = GetFieldNames(Db, Tablename)
+  Case _Procedures
+    InParams() = GetProceduresParams(Db, Tablename, _Input)
+    OutParams() = GetProceduresParams(Db, Tablename, _Output)
+    FillListBox(lstTableFields, InParams())
+    AddMultiItemsToListBox(lstTableFields, OutParams())
+    FieldNames() = lstTableFields.getItems()
+  End Select
+ 
+  FillListBox(lstTableFields, FieldNames())
+  InitializeListboxProcedures(lstTableFields, lstSelTableFields)
+  ToggleListboxControls(Dlg, True)  
+End Sub
+
+Sub cmbOperatesOnChange
+  Operate = GetSelectedItem(cmbOperates)
+  if (Operate = &quot;SELECT&quot;) then
+    ParamTypeStr = GetParamTypeStr(_Output)
+  elseif (Operate = &quot;INSERT&quot;) then
+    ParamTypeStr = GetParamTypeStr(_Input)
+  elseif (Operate = &quot;UPDATE&quot;) then
+    ParamTypeStr = GetParamTypeStr(_Input)
+  elseif (Operate = &quot;DELETE&quot;) then
+    ParamTypeStr = &quot;&quot;
+  end if  
+  FieldNames = GetFieldNames(Db, Tablename)
+  FillListBox(lstTableFields, FieldNames())
+  InitializeListboxProcedures(lstTableFields, lstSelTableFields)
+  ToggleListboxControls(Dlg, True)  
+End Sub
+
+Sub cmbColumnsOnChange
+Dim SelColumn As String
+Dim ColIndex, Count, SelIndex As Integer
+Dim vColumnNames() As String
+
+  pnlSheetsOnFocus
+  SelColumn = GetSelectedItem(cmbColumns)
+
+  if (SelColumn &lt;&gt; &quot;&quot;) then
+    UpdNumberingListBox(lstSelColumnNames, false)
+    SelColumnNames() = lstSelColumnNames.getItems()
+    vColumnNames() = lstColumnNames.getItems()
+    ColIndex = GetFindIndex(SelColumn, vColumnNames())
+    if (ColIndex &gt;= 0) then
+      SetNewSelection(lstColumnNames, ColIndex)
+      MoveSelectedListBox(lstColumnNames, lstSelColumnNames)
+    else
+      AddValueToListBox(lstSelColumnNames, SelColumn)
+      ColIndex = Ubound(SelColumnNames())
+      SetNewSelection(lstSelColumnNames, ColIndex)
+    end if
+    SelIndex = lstSelColumnNames.getSelectedItemPos()
+    if (SelIndex &lt; 0) then
+      lstSelColumnNames.selectItemPos(0, true)
+    end if  
+    ToggleListboxControls(Dlg, True)  
+    UpdNumberingListBox(lstSelColumnNames, true)
+  end if  
+  cmbColumns.Model.Text = &quot;&quot;
+End Sub
+
+Sub lstTableNamesOnChange
+  ToggleListboxControls(Dlg, True)
+End Sub
+
+Sub lstSelTableNamesOnChange
+  ToggleListboxControls(Dlg, True)
+End Sub
+
+Sub lstColumnNamesOnChange
+  ToggleListboxControls(Dlg, True)
+End Sub
+
+Sub lstSelColumnNamesOnChange
+  ToggleListboxControls(Dlg, True)
+End Sub
+
+Sub btnMoveAllItemsOnClick
+  UpdNumberingListBox(lstSelTableFields, false)
+  pnlTablesOnFocus
+  CopyListboxItems(lstTableFields, lstSelTableFields)
+  ToggleListboxControls(Dlg, True)
+  UpdNumberingListBox(lstSelTableFields, true)
+End Sub
+
+Sub btnMoveSingleItemsOnClick
+  UpdNumberingListBox(lstSelTableFields, false)
+  pnlTablesOnFocus
+  MoveSelectedListBox(lstTableFields, lstSelTableFields)
+  ToggleListboxControls(Dlg, True)
+  UpdNumberingListBox(lstSelTableFields, true)
+End Sub
+
+Sub btnRemoveAllItemsOnClick
+  pnlTablesOnFocus
+  CopyListboxItems(lstSelTableFields, lstTableFields)
+  ToggleListboxControls(Dlg, True)
+End Sub
+
+Sub btnRemoveSingleItemsOnClick
+  UpdNumberingListBox(lstSelTableFields, false)
+  pnlTablesOnFocus
+  MoveOrderedSelectedListbox(lstTableFields, lstSelTableFields, False)
+  ToggleListboxControls(Dlg, True)
+  UpdNumberingListBox(lstSelTableFields, true)
+End Sub
+
+Sub btnItemUpOnClick
+  UpdNumberingListBox(lstSelTableFields, false)
+  pnlTablesOnFocus
+  UpDownItem(lstSelTableFields, _UpItem)   
+  UpdNumberingListBox(lstSelTableFields, true)
+End Sub
+
+Sub btnItemDownOnClick
+  UpdNumberingListBox(lstSelTableFields, false)
+  pnlTablesOnFocus
+  UpDownItem(lstSelTableFields, _DownItem)   
+  UpdNumberingListBox(lstSelTableFields, true)
+End Sub
+
+Sub btnMoveAllColumnsOnClick
+Dim SelIndex As Integer
+  UpdNumberingListBox(lstSelColumnNames, false)
+  pnlSheetsOnFocus
+  CopyListboxItems(lstColumnNames, lstSelColumnNames)
+  SelIndex = lstSelColumnNames.getSelectedItemPos()
+  if (SelIndex &lt; 0) then
+    lstSelColumnNames.selectItemPos(ubound(lstSelColumnNames.getItems()), true)
+  end if  
+  ToggleListboxControls(Dlg, True)
+  UpdNumberingListBox(lstSelColumnNames, true)
+End Sub
+
+Sub btnMoveSelColumnsOnClick
+Dim SelIndex As Integer
+  UpdNumberingListBox(lstSelColumnNames, false)
+  pnlSheetsOnFocus
+  MoveSelectedListBox(lstColumnNames, lstSelColumnNames)
+  SelIndex = lstSelColumnNames.getSelectedItemPos()
+  if (SelIndex &lt; 0) then
+    lstSelColumnNames.selectItemPos(0, true)
+  end if  
+  ToggleListboxControls(Dlg, True)
+  UpdNumberingListBox(lstSelColumnNames, true)
+End Sub
+
+Sub btnRemoveAllColumnsOnClick
+  pnlSheetsOnFocus
+  CopyListboxItems(lstSelColumnNames, lstColumnNames)
+  ToggleListboxControls(Dlg, True)
+End Sub
+
+Sub btnRemoveSelColumnsOnClick
+Dim SelIndex, Count As Integer
+Dim SelColumn As String
+  UpdNumberingListBox(lstSelColumnNames, false)
+  pnlSheetsOnFocus
+  SelColumn = lstSelColumnNames.getSelectedItem()
+  Count = GetCountItems(lstSelColumnNames, SelColumn)
+  if (Count = 1) then
+    MoveOrderedSelectedListbox(lstColumnNames, lstSelColumnNames, False)
+  elseif (Count &gt; 1) then 
+    SelIndex = lstSelColumnNames.getSelectedItemPos()
+    lstSelColumnNames.removeItems(SelIndex, 1)
+    if (SelIndex &gt; 0) then
+      lstSelColumnNames.selectItemPos(SelIndex - 1, true)
+    elseif (SelIndex = 0) then
+      lstSelColumnNames.selectItemPos(SelIndex, true)
+    end if  
+  end if
+  ToggleListboxControls(Dlg, True)
+  UpdNumberingListBox(lstSelColumnNames, true)
+End Sub
+
+Sub btnColumnUpOnClick
+  UpdNumberingListBox(lstSelColumnNames, false)
+  pnlSheetsOnFocus
+  UpDownItem(lstSelColumnNames, _UpItem)   
+  UpdNumberingListBox(lstSelColumnNames, true)
+End Sub
+
+Sub btnColumnDownOnClick
+  UpdNumberingListBox(lstSelColumnNames, false)
+  pnlSheetsOnFocus
+  UpDownItem(lstSelColumnNames, _DownItem)   
+  UpdNumberingListBox(lstSelColumnNames, true)
+End Sub
+
+Sub btnSkipRowsUpOnClick
+  if (SkipRows &lt; _MaxInteger) then
+    SkipRows = SkipRows + 1
+  end if
+  edtSkipRows.setText( Cstr(SkipRows) )
+End Sub
+
+Sub btnSkipRowsDownOnClick
+  if (SkipRows &gt; 0 ) then
+    SkipRows = SkipRows - 1
+  end if
+  edtSkipRows.setText( Cstr(SkipRows) )
+End Sub
+
+Sub ShowInfo(AVisible As Boolean)
+  pnlInfo.Visible = AVisible
+  lblInfo.Visible = AVisible
+  pgsInfo.Visible = AVisible
+End Sub
+
+Sub btnImportToDBOnClick
+Dim StartedTime As Date
+Dim FinishedTime As Date
+Dim MsgStr As String
+
+  if not(( (Ubound(FieldNames) = -1) and (Ubound(lstSelTableFields.getItems()) = -1) ) _
+     or ( (Ubound(FieldNames) &gt; -1) and (Ubound(lstSelTableFields.getItems()) &gt; -1) )) then
+    MsgBox &quot;Выберите поля/параметры!&quot;
+    exit sub
+  end if  
+  
+  if ( (Ubound(lstSelColumnNames.getItems()) = -1) and (Ubound(lstSelTableFields.getItems()) &gt; -1) ) then
+    MsgBox &quot;Задайте значения полям/параметрам!&quot;
+    exit sub
+  end if  
+
+  btnImportToDB.Enable = False 
+  ReturnValue = False
+  ShowInfo(True)
+  FetchRecords = 0
+  StartedTime = Now()
+  MsgStr =  &quot;Время начала выполнения             : &quot; &amp; CStr(StartedTime) &amp; CHR(10)
+  lblInfo.Text = &quot;Импортирование данных...&quot;
+  if SaveDataFromArray() then
+    ReturnValue = True
+    FinishedTime = Now()
+    lblInfo.Text = &quot;Импортирование данных прошло успешно! Количестко обработанных записей &quot; &amp; _
+                   &quot;&quot;&quot;&quot; &amp; CStr(FetchRecords) &amp; &quot;&quot;&quot;&quot;
+  else
+    FinishedTime = Now()
+    lblInfo.Text = &quot;Импортирование данных прошло неуспешно!!!&quot;
+  end if    
+
+  MsgStr = MsgStr &amp; &quot;Время окончания выполнения      : &quot; &amp; CStr(FinishedTime) &amp; CHR(10)
+  MsgStr = MsgStr &amp; &quot;Время выполнения                           : &quot; &amp; CStr(CDate(FinishedTime - StartedTime)) &amp; CHR(10)
+  
+  if ReturnValue then 
+    MsgBox MsgStr &amp; &quot;Данные успешно сохраненны! Количестко обработанных записей &quot; &amp; _
+           &quot;&quot;&quot;&quot; &amp; CStr(FetchRecords) &amp; &quot;&quot;&quot;&quot;
+    if not AutoCommit then
+      Db.Commit()
+    end if  
+  else
+    MsgBox MsgStr &amp; &quot;Данные не сохраненны, ошибка:&quot; &amp; lblInfo.Text
+  end if  
+  
+  btnImportToDB.Enable = True 
+  pgsInfo.Model.ProgressValue = 0
+  lblInfo.Text = &quot;&quot;
+  ShowInfo(False)
+     
+End Sub
+
+Sub btnAddValueOnClick
+  if (edtText.getText() &lt;&gt; &quot;&quot;) then
+    UpdNumberingListBox(lstSelColumnNames, false)
+    SelColumnNames() = lstSelColumnNames.getItems()
+    AddValueToListBox(lstSelColumnNames, &quot;[&quot; &amp; edtText.getText() &amp; &quot;]&quot;)
+    SetNewSelection(lstSelColumnNames, Ubound(SelColumnNames()))
+    ToggleListboxControls(Dlg, True)  
+  UpdNumberingListBox(lstSelColumnNames, true)
+  end if  
+  edtText.SetFocus()
+End Sub
+
+Sub btnAddValueOnReleased
+  edtText.SetFocus()
+End Sub
+
+Sub btnDelValueOnClick
+  btnRemoveSelColumnsOnClick 
+  edtText.SetFocus()
+End Sub
+
+Sub btnDelValueOnReleased
+  edtText.SetFocus()
+End Sub
+
+Sub btnAddNullOnClick
+  edtText.Text = &quot;NULL&quot;
+  if (edtText.getText() &lt;&gt; &quot;&quot;) then
+    UpdNumberingListBox(lstSelColumnNames, false)
+    SelColumnNames() = lstSelColumnNames.getItems()
+    AddValueToListBox(lstSelColumnNames, edtText.getText() )
+    SetNewSelection(lstSelColumnNames, Ubound(SelColumnNames()))
+    ToggleListboxControls(Dlg, True)  
+  UpdNumberingListBox(lstSelColumnNames, true)
+  end if  
+  edtText.SetFocus()
+End Sub
+
+Sub btnAddNullOnReleased
+  edtText.SetFocus()
+End Sub
+
+Sub btnPrevOnClick
+Dim Page As Integer
+  btnNext.Enable = True
+  Page = Dlg.Model.Step
+  if Page &gt; 0 then
+    Dlg.Model.Step = Page - 1
+  end if  
+  if Dlg.Model.Step = _StartPage then
+    btnPrev.Enable = False
+    InitializeDialogByMode(Dlg.Model.Step)
+  end if  
+  if (lblInfo.Text = &quot;&quot;) then 
+    ShowInfo(False)
+  end if  
+End Sub
+
+Sub btnNextOnClick
+Dim Page As Integer
+  btnPrev.Enable = True
+  Page = Dlg.Model.Step
+  Dlg.Model.Step = Page + 1
+  if Dlg.Model.Step = _PagesCount - 1 then
+    btnNext.Enable = False
+    InitializeDialogByMode(Dlg.Model.Step)
+  end if
+  if (lblInfo.Text = &quot;&quot;) then 
+    ShowInfo(False)
+  end if  
+End Sub
+
+Sub InitializeDialog
+  Dlg.Model.Step = _StartPage
+  ControlUpdating = True
+  
+  cbxUseRange         = Dlg.getControl(&quot;cbxUseRange&quot;)
+  cmbTableNames       = Dlg.getControl(&quot;cmbTableNames&quot;) 
+  cmbOperates         = Dlg.getControl(&quot;cmbOperates&quot;)
+  lblSelectTable      = Dlg.getControl(&quot;lblSelectTable&quot;)
+  lblTableFields      = Dlg.getControl(&quot;lblTableFields&quot;)
+  lstTableFields      = Dlg.getControl(&quot;lstTableFields&quot;)
+  lstSelTableFields   = Dlg.getControl(&quot;lstSelTableFields&quot;)
+  lstColumnNames      = Dlg.getControl(&quot;lstColumnNames&quot;)
+  lstSelColumnNames   = Dlg.getControl(&quot;lstSelColumnNames&quot;)
+  lblSkipRows         = Dlg.getControl(&quot;lblSkipRows&quot;) 
+  edtSkipRows         = Dlg.getControl(&quot;edtSkipRows&quot;)
+  edtText             = Dlg.getControl(&quot;edtText&quot;) 
+  btnImportToDB       = Dlg.getControl(&quot;btnImportToDB&quot;)
+  pnlInfo             = Dlg.getControl(&quot;pnlInfo&quot;)
+  lblInfo             = Dlg.getControl(&quot;lblInfo&quot;)
+  lblRange            = Dlg.getControl(&quot;lblRange&quot;)
+  lblRange.Text       = lblRange.Text &amp; GetRange(Range) 
+  pgsInfo             = Dlg.getControl(&quot;pgsInfo&quot;)
+  lblColumn           = Dlg.getControl(&quot;lblColumn&quot;)
+  cmbColumns          = Dlg.getControl(&quot;cmbColumns&quot;)
+  
+  btnItemDown         = Dlg.getControl(&quot;btnItemDown&quot;)
+  btnItemUp           = Dlg.getControl(&quot;btnItemUp&quot;)
+  btnRemoveAllItems   = Dlg.getControl(&quot;btnRemoveAllItems&quot;)
+  btnRemoveSingleItem = Dlg.getControl(&quot;btnRemoveSingleItem&quot;)
+  btnMoveAllItems     = Dlg.getControl(&quot;btnMoveAllItems&quot;)
+  btnMoveSingleItem   = Dlg.getControl(&quot;btnMoveSingleItem&quot;)
+  
+  btnColumnDown       = Dlg.getControl(&quot;btnColumnDown&quot;)
+  btnColumnUp         = Dlg.getControl(&quot;btnColumnUp&quot;)
+  btnRemoveAllColumns = Dlg.getControl(&quot;btnRemoveAllColumns&quot;)
+  btnRemoveSelColumns = Dlg.getControl(&quot;btnRemoveSelColumns&quot;)
+  btnMoveAllColumns   = Dlg.getControl(&quot;btnMoveAllColumns&quot;)
+  btnMoveSelColumns   = Dlg.getControl(&quot;btnMoveSelColumns&quot;)   
+  btnAddValue         = Dlg.getControl(&quot;btnAddValue&quot;)   
+  btnAddValue         = Dlg.getControl(&quot;btnDelValue&quot;)   
+  btnAddNull          = Dlg.getControl(&quot;btnAddNull&quot;)   
+  btnPrev             = Dlg.getControl(&quot;btnPrev&quot;)   
+  btnPrev.Enable      = False
+  btnNext             = Dlg.getControl(&quot;btnNext&quot;)   
+  edtSkipRows.Text    = Range.StartRow + 1
+  SkipRows            = Range.StartRow + 1
+  Operates(0)         = &quot;SELECT&quot;
+  Operates(1)         = &quot;INSERT&quot;
+  rem Operates(2)         = &quot;UPDATE&quot;
+  rem Operates(3)         = &quot;DELETE&quot;
+  
+  ShowInfo(False)
+
+  InitializeDialogByMode(_Tables)
+  btnNextOnClick
+  ControlUpdating = False
+
+End Sub
+
+Sub InitializeOriginalList(AList() as String)
+  OriginalList()= AList()
+End Sub
+
+Sub InitializeDialogByMode(ADialogMode As Integer)
+Dim NullArray() As String
+  ValuesArray() = NullArray()
+  Select Case ADialogMode
+  Case _Tables
+    Dlg.Model.Step = _Tables
+    cbxUseRange.State = 1
+    btnImportToDB.Label = &quot;Импортировать данные в БД&quot;
+    Tablename = &quot;UNT_EXPORT&quot;
+    Operate   = &quot;INSERT&quot;
+    ParamTypeStr = GetParamTypeStr(_Input)
+    TableNames() = GetTableNames(Db)
+    FillComboBox(cmbTableNames, Tablenames())
+    FillComboBox(cmbOperates, Operates())
+    cmbTableNames.Model.Text = Tablename
+    cmbOperates.Model.Text   = Operate
+    FieldNames() = GetFieldNames(Db, Tablename)
+    FillListBox(lstTableFields, FieldNames())
+  Case _Procedures
+    Dlg.Model.Step = _Procedures
+    cbxUseRange.State = 1
+    btnImportToDB.Label = &quot;Выполнить процедуру&quot;
+    Tablename = &quot;UNT_GET_ARTICLE_ID_BY_ARTICLE&quot;
+    TableNames() = GetProceduresNames(Db)
+    FillComboBox(cmbTableNames, Tablenames)
+
+    cmbTableNames.Model.Text = Tablename
+    InParams()  = GetProceduresParams(Db, Tablename, _Input)
+    OutParams() = GetProceduresParams(Db, Tablename, _Output)
+    FillListBox(lstTableFields, InParams())
+    AddMultiItemsToListBox(lstTableFields, OutParams())
+    FieldNames() = lstTableFields.getItems()
+  End Select
+    ColumnNames() = GetColumnNames(Range, SkipRows)
+    FillListBox(lstColumnNames, ColumnNames()) 
+    FillComboBox(cmbColumns, ColumnNames())
+    InitializeListboxProcedures(lstTableFields, lstSelTableFields)
+    InitializeListboxProcedures(lstColumnNames, lstSelColumnNames)
+    ToggleListboxControls(Dlg, True)
+End Sub
+
+Function StartDialog()
+    LoadLibrary(&quot;Import&quot;)
+    Dlg = CreateUnoDialog(DialogLibraries.Import.DlgTablesList)
+    InitializeDialog      
+    Dlg.execute()
+End Function
+
+Sub CloseDialog
+    Dlg.endExecute()
+End Sub
+
+
+Function GetTableNames(ADb As Object)
+  GetTableNames = ADb.Tables.ElementNames()
+End Function
+
+Function GetFieldNames(ADb As Object, ATableName As String)
+Dim I, MaxIndex As Integer
+Dim NullArray() As String
+  if (ParamTypeStr = &quot;&quot;) then
+    GetFieldNames = NullArray()
+    exit Function
+  end if
+  Columns = ADb.Tables.GetByName(ATablename).Columns
+  FieldNames() = Columns.GetElementNames()
+  MaxIndex = Ubound(FieldNames())
+  For I = 0 To MaxIndex
+    FieldNames(I) = ParamTypeStr &amp; FieldNames(I) 
+  Next I
+  GetFieldNames = FieldNames()
+End Function
+
+Sub FillComboBox(AComboBox As Object, AStringList() As String)
+Dim I, MaxIndex As Long
+  ClearListBox(AComboBox)    
+  MaxIndex = Ubound(AStringList())
+  if (MaxIndex = -1) Then 
+    exit Sub
+  end if
+  For I = 0 To MaxIndex
+    AComboBox.addItem(AStringList(I), I) 
+  Next I
+End Sub
+
+Sub FillListBox(AListBox As Object, AStringList() As String)
+Dim I, MaxIndex As Long
+  ClearListBox(AListBox)    
+  MaxIndex = Ubound(AStringList())
+  if (MaxIndex &gt; -1) Then 
+    For I = 0 To MaxIndex
+      AListBox.addItem(AStringList(I), I) 
+    Next I
+  end if
+End Sub
+
+Function ListBoxToStringList(AListBox As Object)
+Dim I, MaxIndex As Long
+Dim StringList() As String 
+  MaxIndex = Ubound(AListBox.getItems())
+  if (MaxIndex = -1) Then 
+    ListBoxToStringList = StringList()
+    exit Function
+  end if
+  ReDim StringList(MaxIndex) As String  
+  For I = 0 To MaxIndex
+    StringList(I) = AListBox.getItem(I) 
+  Next I
+   ListBoxToStringList = StringList()
+End Function
+
+Sub UpdNumberingListBox(AListBox As Object, Optional AIsNumbering As Boolean)
+Dim ResultStr As String
+Dim StartPos As Long
+Dim CurrentPos As Long
+Dim I, MaxIndex as Long
+Dim StringList() As String 
+Dim SelectedItems() As Long
+
+  if IsMissing(AIsNumbering) then
+    AIsNumbering = true
+  end if
+  
+  MaxIndex = Ubound(AListBox.getItems())
+  if (MaxIndex = -1) Then 
+    exit Sub
+  end if
+  
+  StringList() = AListBox.getItems()
+
+  StartPos = 1
+  For I = 0 To MaxIndex
+    ResultStr = &quot;&quot;
+    CurrentPos = InStr(StartPos, StringList(I), &quot;:&quot;)
+      ResultStr = StringList(I) 
+      If CurrentPos &lt;&gt; 0 Then
+        ResultStr = Mid(StringList(I), StartPos, CurrentPos - 1)
+        if IsNumeric(ResultStr) then
+          ResultStr = Mid(StringList(I),CurrentPos + 1, Len(StringList(I)) - CurrentPos)
+        else 
+          ResultStr = StringList(I) 
+        end if  
+      End If 
+      if AIsNumbering then
+        StringList(I) = CStr(I) &amp; &quot;:&quot; &amp; ResultStr
+      else
+        StringList(I) = ResultStr
+      end if              
+  Next I
+
+  SelectedItems() = AListBox.getSelectedItemsPos()
+  FillListBox(AListBox, StringList())
+  AListBox.selectItemsPos(SelectedItems(), true)
+  
+End Sub
+
+Sub ClearListBox(AListBox As Object)
+Dim MaxIndex As Long
+  MaxIndex = Ubound(AListBox.getItems())
+  if (MaxIndex &gt; -1) Then 
+    AListBox.removeItems(0, MaxIndex + 1)
+  end if  
+End Sub
+
+Function GetRange(ARange As Object) As String
+  GetRange() = GetColNameByIndex(ARange, ARange.startColumn, ARange.StartRow) &amp; CStr(ARange.startRow + 1) &amp; &quot;:&quot; _
+               &amp; GetColNameByIndex(ARange, ARange.endColumn, ARange.StartRow) &amp; CStr(ARange.endRow + 1)  
+End Function
+
+Function GetColNameByIndex(ARange As Object, AColIndex As Long) As String
+  GetColNameByIndex() = thisComponent.CurrentSelection.getSpreadSheet().getCellByPosition(AColIndex, ARange.StartRow).Columns.ElementNames(0)
+End Function
+
+Function MIN(AParam1 As Long, AParam2 As Long)
+  if AParam1 &gt; AParam2 then MIN() = AParam2 else MIN() = AParam1 
+End Function
+
+Function GetColumnNames(ARange As Object, AStartRow As Long)
+Dim Sheet as Object
+Dim Cell as Object
+Dim ElementNames(0) As String
+Dim StartRow, EndRow, StartCol, EndCol as Long
+Dim I, MaxIndex As Long
+Dim StringList() As String 
+Dim NullArray()  As String
+
+  StartRow = ARAnge.StartRow 
+  EndRow = ARange.EndRow
+  
+  if (AStartRow - 1  &gt; EndRow) then 
+    GetColumnNames = NullArray()
+    exit function
+  end if  
+  
+  StartCol = ARange.startColumn
+  EndCol = ARange.endColumn
+  Sheet = thisComponent.CurrentSelection.getSpreadSheet
+  
+  MaxIndex = EndCol - StartCol
+  ReDim StringList(MaxIndex) As String  
+  For I = 0 To MaxIndex
+    ElementNames() = Sheet.getCellByPosition(StartCol + I, AStartRow).Columns.ElementNames
+    StringList(I) = ElementNames(0)
+    if  (AStartRow &gt; StartRow) then
+      StringList(I) = StringList(I) &amp; &quot;:&quot; &amp; ucase(Sheet.getCellByPosition(StartCol + I, AStartRow - 1).String)
+    end if  
+ 
+    if (StringList(I) = &quot;&quot;) Then 
+      GetColumnNames = NullArray()
+      exit function
+    end if
+  Next I
+  GetColumnNames = StringList()
+End Function
+
+Sub AddValueToListBox(AListBox As Object, AValue As String)
+Dim ItemsCount As Integer
+  ItemsCount = Ubound(SelColumnNames())
+  ReDim Preserve SelColumnNames(ItemsCount + 1)
+  SelColumnNames(ItemsCount + 1) = AValue
+  FillListBox(AListBox, SelColumnNames())
+End Sub
+
+Function CheckOutDataRange(ARange As Object, ASkipRow As Long, AColumnNames() As String, _
+                           AFieldNames() As String, AUseRange As Integer)
+Dim OutRange as Object
+Dim Sheet as Object
+Dim StartRow, EndRow, StartCol, EndCol as Long
+Dim I, MaxColIndex, MaxFieldIndex, MaxRowIndex, ColIndex As Long
+Dim SearchResult  As Object
+Dim NullArray() As String
+
+  CheckOutDataRange = False
+  
+  StartRow = ARange.StartRow
+  EndRow = ARange.EndRow
+
+  if (ASkipRow &gt; 0) then 
+    StartRow = ASkipRow
+  end if  
+ 
+  if (StartRow &gt; EndRow) then 
+    EndRow = StartRow
+  end if  
+  
+  StartCol = ARange.startColumn
+  EndCol = ARange.endColumn
+  Sheet = thisComponent.CurrentSelection.getSpreadsheet
+  
+  MaxFieldIndex = Ubound(AFieldNames())
+  MaxColIndex = Ubound(AColumnNames())
+  if (MaxFieldIndex = -1) or (MaxColIndex = -1) then
+    exit Function
+  end if 
+  MaxColIndex = MIN(MaxFieldIndex, MaxColIndex)
+  ReDim Preserve AColumnNames(MaxColIndex) As String   
+  ReDim Preserve AFieldNames(MaxColIndex) As String  
+  
+  MaxRowIndex = MIN(_MaxInteger, EndRow - StartRow)
+  
+  if (AUseRange = 0) then 
+    MaxRowIndex = 0  
+  end if
+    
+  For I = 0 To MaxColIndex
+    if IsParamByType(AFieldNames(), I, _Output) then
+      ColIndex = GetFindIndex(AColumnNames(I), ColumnNames())
+      if (AUseRange &gt; 0) and (ColIndex &gt;= 0) then
+        OutRange = Sheet.getCellRangeByPosition(StartCol + ColIndex, StartRow, StartCol + ColIndex, StartRow + MaxRowIndex)
+        SearchResult = SimpleSheetSearch(&quot;.*&quot;, OutRange)
+        if (not IsNull(SearchResult)) then
+          exit Function
+        end if
+      end if
+    end if
+  Next I 
+  CheckOutDataRange = True
+End Function
+
+function CountResultSet(AData As Object)
+Dim Count As Long
+Dim Result As Boolean
+  Count = 0
+  Result = AData.first()
+  if Result then
+    Count = 1
+    While AData.next
+      Count = Count + 1
+    wend 
+  end if 
+  AData.first()
+  CountResultSet = Count 
+end function
+
+Function UpdOutDataRange(ASheet As Object, AData As Object, ARange As Object, ASkipRow As Long, AColumnNames() As String, _
+                         AFieldNames() As String, AUseRange As Integer)
+Dim Sheet as Object
+Dim Result as Boolean
+Dim StartRow, EndRow, StartCol, EndCol, ParamDataPos as Long
+Dim I, J, MaxColIndex, MaxFieldIndex, MaxRowIndex, ColIndex As Long
+Dim ResultStr  As String
+
+  UpdOutDataRange = False
+  
+  StartRow = ARange.StartRow
+  EndRow   = ARange.EndRow
+
+  if (ASkipRow &gt; 0) then 
+    StartRow = ASkipRow
+  end if  
+ 
+  if (StartRow &gt; EndRow) then 
+    EndRow = StartRow
+  end if  
+  
+  StartCol = ARange.startColumn
+  EndCol = ARange.endColumn
+  Sheet = ASheet
+  
+  MaxFieldIndex = Ubound(AFieldNames())
+  MaxColIndex = Ubound(AColumnNames())
+  if (MaxFieldIndex = -1) or (MaxColIndex = -1) then
+    exit Function
+  end if 
+  MaxColIndex = MIN(MaxFieldIndex, MaxColIndex)
+  ReDim Preserve AColumnNames(MaxColIndex) As String   
+  ReDim Preserve AFieldNames(MaxColIndex) As String  
+  
+  FetchRecords = CountResultSet(AData)
+  MaxRowIndex = MIN(FetchRecords -1, EndRow - StartRow)
+  
+  if (AUseRange = 0) then 
+    MaxRowIndex = 0  
+  end if
+  
+  I = 0
+  
+  if (MaxOutParamsIndex &gt; -1) and (MaxInParamsIndex = -1) then 
+    InitProgress(MaxRowIndex + 1, ProgressStep) 
+  end if
+ 
+  Result = true
+  While Result and (I &lt;= MaxRowIndex)
+    ParamDataPos = 0
+    For J = 0 To MaxColIndex
+      if IsParamByType(AFieldNames(), J, _Output) then
+        ColIndex = GetFindIndex(AColumnNames(J), ColumnNames())
+        if (AUseRange &gt; 0) and (ColIndex &gt;= 0) then
+          ParamDataPos = ParamDataPos + 1
+          ResultStr = AData.getString(ParamDataPos)
+          if (not IsNull(ResultStr)) then
+            Sheet.getCellByPosition(StartCol + ColIndex, StartRow + I).String  =  ResultStr  
+          end if
+        end if  
+      end if
+    Next J
+    if (MaxOutParamsIndex &gt; -1) and (MaxInParamsIndex = -1) then 
+      PaintProgress(I, ProgressStep)
+    end if
+    I = I + 1
+    Result = AData.next
+  Wend
+  if (MaxOutParamsIndex &gt; -1) and (MaxInParamsIndex = -1) then 
+    FetchRecords = MaxRowIndex + 1   
+    pgsInfo.Model.ProgressValue = FetchRecords
+  end if
+  UpdOutDataRange = True
+End Function
+
+Sub SetDataArray(ARange As Object, ASkipRow As Long, AColumnNames() As String, _
+                 AFieldNames() As String, AUseRange As Integer)
+Dim Sheet as Object
+Dim Cell as Object
+Dim StartRow, EndRow, StartCol, EndCol as Long
+Dim I, J, MaxColIndex, MaxFieldIndex, MaxRowIndex, ColIndex, _
+    CountInParams, FirstInParamsIndex, LastInParamsIndex  As Long
+Dim ValueString  As String
+Dim ValuesString As String
+Dim NullArray() As String
+Dim Value As Variant
+Dim Result As Boolean
+Dim NumberFormats As Object
+Dim NumberFormatString As String
+Dim NumberFormat, NumberType As Integer
+Dim StartPos, CurrentPos As Integer 
+Dim ResultStr As String
+Dim BlankRowsCount As Integer
+
+  BlankRowsCount = 0
+
+  ValuesArray() = NullArray()
+  StartRow = ARange.StartRow
+  EndRow = ARange.EndRow
+
+  if (ASkipRow &gt; 0) then 
+    StartRow = ASkipRow
+  end if  
+ 
+  if (StartRow &gt; EndRow) then 
+    EndRow = StartRow
+  end if  
+  
+  StartCol = ARange.startColumn
+  EndCol = ARange.endColumn
+  Sheet = thisComponent.CurrentSelection.getSpreadsheet
+  
+  MaxFieldIndex = Ubound(AFieldNames())
+  MaxColIndex = Ubound(AColumnNames())
+  if (MaxFieldIndex = -1) or (MaxColIndex = -1) then
+    exit Sub
+  end if 
+  MaxColIndex = MIN(MaxFieldIndex, MaxColIndex)
+  ReDim Preserve AColumnNames(MaxColIndex) As String   
+  ReDim Preserve AFieldNames(MaxColIndex) As String  
+  
+  MaxRowIndex = MIN(_MaxInteger, EndRow - StartRow)
+  
+  if (AUseRange = 0) then 
+    MaxRowIndex = 0  
+  end if
+    
+  ReDim ValuesArray(MaxRowIndex) As String  
+  CountInParams = ubound(GetParamsArrayByType(AFieldNames(), _Input))
+  if (CountInParams = -1) then
+    exit Sub
+  end if 
+  
+  FirstInParamsIndex = GetFirstIndexParamsArrayByType(AFieldNames(), _Input)
+  LastInParamsIndex  = GetLastIndexParamsArrayByType(AFieldNames(), _Input)
+     
+  For I = 0 To MaxRowIndex
+    ValuesString = &quot;&quot;
+    For J = 0 To MaxColIndex
+      ValueString = &quot;&apos;&apos;&quot;
+      if IsParamByType(AFieldNames(), J, _Input) then
+        ColIndex = GetFindIndex(AColumnNames(J), ColumnNames())
+        if (AUseRange &gt; 0) and (ColIndex &gt;= 0) then
+          Cell = Sheet.getCellByPosition(StartCol + ColIndex, StartRow + I) 
+          if (Cell.Type = com.sun.star.table.CellContentType.TEXT) then
+            ValueString = &quot;&apos;&quot; &amp; Cell.String &amp; &quot;&apos;&quot;
+          elseif (Cell.Type = com.sun.star.table.CellContentType.VALUE) _ 
+                  or (Cell.Type = com.sun.star.table.CellContentType.FORMULA) then
+            
+            Value = Cell.Value
+            NumberFormats = thisComponent.NumberFormats 
+            NumberFormat = Cell.NumberFormat
+            NumberType = NumberFormats.getByKey(NumberFormat).Type
+            if (NumberType = com.sun.star.util.NumberFormat.DATE) then
+              Value = CDate(Cell.Value)
+            end if 
+            ValueString = &quot;&apos;&quot; &amp; Replace(CStr(Value), &quot;,&quot;, &quot;.&quot;)  &amp; &quot;&apos;&quot;
+          end if  
+        else
+          if (AColumnNames(J) = &quot;NULL&quot;) then
+            ValueString = AColumnNames(J)
+          else  
+            StartPos = 1
+            ResultStr = AColumnNames(J)
+            CurrentPos = InStr(StartPos, ResultStr, &quot;[&quot;)
+            if (CurrentPos &gt;= 0) then
+              StartPos = CurrentPos + 1
+              ResultStr = Mid(ResultStr, StartPos, Len(ResultStr) - CurrentPos)
+              CurrentPos = InStr(StartPos, ResultStr, &quot;]&quot;)
+              if (CurrentPos &gt;= 0) then
+                StartPos = 1
+                ResultStr = Mid(ResultStr, StartPos, Len(ResultStr) - 1)
+              end if
+            end if
+           
+            ValueString = &quot;&apos;&quot; &amp; ResultStr &amp; &quot;&apos;&quot;
+          end if
+        end if
+        
+        &apos; If row is blank
+        if (J = FirstInParamsIndex) and (ValueString = &quot;&apos;&apos;&quot;) then
+          BlankRowsCount = BlankRowsCount + 1
+        
+          if (BlankRowsCount &gt; _MaxBlankRowsCount) then            
+            if (I &gt; 0) then
+              ReDim Preserve ValuesArray(I - 1) As String
+            else
+              ValuesArray() = NullArray()
+            end if  
+            exit Sub            
+          end if  
+        else
+          BlankRowsCount = 0  
+        end if
+         
+        if (J &gt; FirstInParamsIndex) and (ValueString = &quot;&apos;&apos;&quot;) then
+          ValueString  = &quot;NULL&quot;  
+        end if 
+        ValuesString = ValuesString &amp; ValueString 
+        if (J &lt; LastInParamsIndex) then 
+          ValuesString = ValuesString &amp; &quot;,&quot;
+        end if
+      end if
+          
+    Next J 
+    ValuesArray(I) = ValuesString
+  Next I  
+  
+End Sub
+
+Sub InitProgress(AValueMax As Long, AStep As Long)
+  pnlInfo.Visible = True
+  pgsInfo.Visible = True
+  pgsInfo.Model.ProgressValueMax = AValueMax
+  pgsInfo.Model.ProgressValueMin = 0
+  AStep = pgsInfo.Model.ProgressValueMax * 0.05
+  if (AStep = 0) then
+    AStep = 1
+  end if 
+end Sub
+
+Sub PaintProgress(AValue As Long, AStep As Long)
+  if ((AValue MOD AStep) = 0) then
+    pgsInfo.Model.ProgressValue = AValue
+  end if
+end Sub
+
+Function SaveDataFromArray() As Boolean
+
+Dim ResultSet As Object
+Dim I As Long, MaxColIndex As Long, MaxFieldIndex As Long
+Dim QueryType As Integer
+Dim SqlText   As String
+Dim NullArray() As String
+Dim Sheet as Object
+
+  SaveDataFromArray() = False
+
+  UpdNumberingListBox(lstSelColumnNames, false)
+  UpdNumberingListBox(lstSelTableFields, false)
+
+  SelFieldNames()     = lstSelTableFields.getItems()
+  SelColumnNames()    = lstSelColumnNames.getItems()
+  MaxFieldIndex       = Ubound(SelFieldNames())
+  MaxColIndex         = Ubound(SelColumnNames())
+  
+  ValuesArray()     = NullArray()
+  InParams()        = GetParamsArrayByType(SelFieldNames(), _Input, False)
+  OutParams()       = GetParamsArrayByType(SelFieldNames(), _Output, False)
+  MaxInParamsIndex  = Ubound(InParams())
+  MaxOutParamsIndex = Ubound(OutParams())
+
+  if (MaxFieldIndex &gt; -1) and (MaxColIndex &gt; -1) and (MaxInParamsIndex &gt; -1) then
+    SetDataArray(Range, SkipRows, SelColumnNames(), SelFieldNames(), cbxUseRange.State)
+  end if 
+  
+  UpdNumberingListBox(lstSelColumnNames, true)
+  UpdNumberingListBox(lstSelTableFields, true)
+
+  MaxRowIndex = Ubound(ValuesArray())
+  
+  QueryType = _SelQuery
+
+  Sheet = thisComponent.CurrentSelection.getSpreadsheet
+  
+  if (Dlg.Model.Step = _Tables) then
+    if (Operate = &quot;SELECT&quot;) then
+      if (MaxOutParamsIndex = -1) then
+        MsgBox(&quot;Нет выходящих(out:) параметров!&quot;)
+        exit function
+      end if
+    elseif ((Operate = &quot;INSERT&quot;) or (Operate = &quot;UPDATE&quot;)) then 
+      if (MaxInParamsIndex = -1) then
+        MsgBox(&quot;Нет входящих(in:) параметров!&quot;)
+        exit function
+      end if  
+    end if  
+  
+    if ((Operate = &quot;INSERT&quot;) or (Operate = &quot;UPDATE&quot;) or (Operate = &quot;DELETE&quot;)) then 
+      QueryType = _UpdQuery
+    end if  
+  
+
+  elseif (Dlg.Model.Step = _Procedures) then
+    
+    if (MaxOutParamsIndex = -1) then
+      ReDim OutParams(0) As String
+      OutParams(0) = &quot;&quot;
+    end if
+    
+    if (MaxInParamsIndex = -1) then
+      ReDim ValuesArray(0) As String
+      ValuesArray(0) = &quot;&quot;
+    elseif (MaxRowIndex = -1) then
+        MsgBox(&quot;Нет данных для входящих(in:) параметров!&quot;)
+        exit function
+    end if
+      
+    if (MaxOutParamsIndex &gt; -1) and (MaxInParamsIndex = -1) then
+      MaxRowIndex = Range.EndRow - SkipRows 
+    end if 
+    
+    if (OutParams(0) = &quot;&quot;)  then
+      QueryType = _UpdQuery
+    end if
+    
+  end if   
+ 
+  if (MaxRowIndex = -1) then
+    MaxRowIndex = 0
+  end if
+   
+  if (MaxOutParamsIndex = -1) or (MaxInParamsIndex &gt; -1) then 
+    InitProgress(MaxRowIndex + 1, ProgressStep) 
+  end if
+  
+  For I = 0 To MaxRowIndex
+  
+    if Dlg.Model.Step = _Tables then
+      if (Operate = &quot;SELECT&quot;) then
+        SqlText = sql_select(TableName, OutParams())
+      elseif (Operate = &quot;INSERT&quot;) then
+        SqlText = sql_insert(TableName, InParams(), ValuesArray(I))
+      elseif (Operate = &quot;UPDATE&quot;) then
+        SqlText = sql_update(TableName, InParams(), ValuesArray(I))
+      elseif (Operate = &quot;DELETE&quot;) then
+        SqlText = sql_delete(TableName)
+      end if  
+    elseif Dlg.Model.Step = _Procedures then
+      SqlText = sql_routine(Db, TableName, SelFieldNames(), OutParams(), ValuesArray(I))
+    end if
+    
+    On Error GoTo ErrorHandleMark     
+      ResultSet = QueryExecute(SqlText, QueryType)
+      GoTo ContinueMark
+
+    ErrorHandleMark: 
+      MsgBox &quot;Ошибка &quot; &amp; Err &amp; &quot;: &quot; &amp; Error$ &amp; &quot; (line : &quot; &amp; Erl &amp; &quot;)&quot;
+      Resume ExitMark
+  
+    ContinueMark: 
+    
+    if not IsNull(ResultSet) then
+      if (I = 0) and not CheckOutDataRange(Range, SkipRows, SelColumnNames(), SelFieldNames(), cbxUseRange.State) then
+        if (MsgBox(&quot;Обновить выходящие данные?&quot;, 4) &lt;&gt; 6) then
+          exit function
+        end if  
+      end if 
+      UpdOutDataRange(Sheet, ResultSet, Range, SkipRows + I, SelColumnNames(), SelFieldNames(), cbxUseRange.State)
+    end if
+    
+    if (MaxOutParamsIndex = -1) or (MaxInParamsIndex &gt; -1) then 
+      PaintProgress(I, ProgressStep)
+    end if
+      
+  next I
+
+  ExitMark:
+
+  if (MaxOutParamsIndex = -1) or (MaxInParamsIndex &gt; -1) then 
+    FetchRecords = MaxRowIndex + 1   
+    pgsInfo.Model.ProgressValue = FetchRecords
+  end if
+    
+  SaveDataFromArray() = (I = (MaxRowIndex + 1))
+end Function
+
+Sub edtSkipRowsOnChanged
+Dim SkipRowsStr As String
+  if ControlUpdating then Exit Sub
+  SkipRowsStr = edtSkipRows.getText()
+  SkipRows = CInt(SkipRowsStr) 
+  ColumnNames() = GetColumnNames(Range, SkipRows)
+  FillListBox(lstColumnNames, ColumnNames())
+  FillComboBox(cmbColumns, ColumnNames())
+  InitializeListboxProcedures(lstColumnNames, lstSelColumnNames)
+End Sub
+
+Sub CopyListboxItems(SourceListbox as Object, TargetListbox As Object)
+  FillListBox(TargetListbox, OriginalList())
+  ClearListBox(SourceListbox)
+End Sub
+
+Sub UpDownItem(AListBox As Object, Direction As Long)
+Dim MinSelIndex, MaxSelIndex, MinIndex, MaxIndex, OldIndex, NewIndex As Long
+Dim SelList() As Long
+Dim ResultArray() As String
+Dim TmpStr As String
+
+  MinSelIndex = Lbound(AListBox.getSelectedItems())
+  MaxSelIndex = Ubound(AListBox.getSelectedItems())
+  MinIndex = Lbound(AListBox.getItems())
+  MaxIndex = Ubound(AListBox.getItems())
+  if MaxSelIndex = -1 then 
+    exit Sub
+  end if 
+  
+  SelList = AListBox.getSelectedItemsPos()
+  
+  if Direction = _UpItem then
+    OldIndex = SelList(MaxSelIndex)
+    if OldIndex = MinIndex then 
+      exit Sub
+    end if
+    NewIndex = OldIndex - 1
+  elseif Direction = _DownItem then
+    OldIndex = SelList(MinSelIndex)
+    if OldIndex = MaxIndex then 
+      exit Sub
+    end if
+    NewIndex = OldIndex + 1
+  end if
+
+  ResultArray() = AListBox.getItems()
+  TmpStr = ResultArray(OldIndex)
+  ResultArray(OldIndex) = ResultArray(NewIndex)
+  ResultArray(NewIndex) = TmpStr
+  
+  FillListBox(AListBox, ResultArray())
+  SetNewSelection(AListBox, NewIndex)  
+End Sub
+
+Sub MoveSelectedListBox(ASourceListbox As Object, ATargetListbox As Object)
+Dim MaxCurTarget As Long
+Dim MaxSourceSelected As Long
+Dim N As Long
+Dim M As Long
+Dim CurIndex As Long
+Dim SelList() As Long
+Dim List() As String
+Dim OldTargetSelect As Long
+Dim OldSourceSelect As Long
+Dim TargetList() As String 
+
+	MaxCurTarget = Ubound(ATargetListbox.getItems())
+	MaxSourceSelected = Ubound(ASourceListbox.getSelectedItems())
+	
+	If MaxSourceSelected &gt; -1 then
+	    SelList() = ASourceListbox.getSelectedItemsPos()
+		OldSourceSelect = SelList(0)
+	    SelList() = ATargetListbox.getSelectedItemsPos()
+	    OldTargetSelect = -1
+		If MaxCurTarget &gt; -1 and Ubound(SelList()) &gt; -1  then 
+		    OldTargetSelect = SelList(0)
+		end if
+    	ReDim TargetList(MaxCurTarget + MaxSourceSelected + 1) 
+	    SelList() = ASourceListbox.getSelectedItemsPos()
+		for N = 0 To MaxCurTarget
+			TargetList(N) = ATargetListbox.getItem(N)
+		next N
+		for M = 0 To MaxSourceSelected
+			CurIndex = SelList(M)
+	        TargetList(N) = ASourceListbox.getItem(CurIndex)
+			N = N + 1
+		next M
+		FillListBox(ATargetListbox, TargetList())
+		List() = RemoveSelected(ASourceListbox)
+		FillListBox(ASourceListbox, List())
+		SetNewSelection(ASourceListbox, OldSourceSelect)
+		SetNewSelection(ATargetListbox, OldTargetSelect)
+	end If
+end Sub
+
+
+
+Sub MoveOrderedSelectedListbox(lstSource as Object, lstTarget as Object, bMoveAll as Boolean)
+Dim MaxSelected as Long
+Dim MaxSourceIndex as Long
+Dim MaxOriginalIndex as Long
+Dim MaxNewIndex as Long
+Dim n as Long
+Dim m as Long
+Dim CurIndex as Long
+Dim SearchString as String
+Dim SourceList() as String
+Dim SelList() As Long
+Dim List() As String
+Dim SelStringList() As String
+Dim NewSourceList() As String
+Dim iOldTargetSelect as Long
+Dim iOldSourceSelect as Long
+  If bMoveAll Then
+    InitializeListboxProcedures(lstSource, lstTarget)
+  Else
+	MaxOriginalIndex = Ubound(OriginalList())
+	MaxSelected = Ubound(lstTarget.getSelectedItems())
+	if (MaxSelected = -1) Then 
+ 	  exit Sub
+    end if
+    SelList() = lstTarget.getSelectedItemsPos()
+	iOldTargetSelect = SelList(0)
+    SelList() = lstSource.getSelectedItemsPos()
+	If Ubound(SelList()) &gt; -1 Then
+		iOldSourceSelect = SelList(0)
+	End If
+	ReDim SelStringList(MaxSelected)
+    SelList() = lstTarget.getSelectedItemsPos()
+	For n = 0 To MaxSelected
+		CurIndex = SelList(n)
+		SelStringList(n) = lstTarget.getItem(CurIndex)
+	Next n
+	SourceList() = lstSource.getItems()
+	MaxSourceIndex = Ubound(lstSource.getItems())
+	MaxNewIndex = MaxSelected + MaxSourceIndex + 1
+	ReDim NewSourceList(MaxNewIndex)
+	m = 0
+	For n = 0 To MaxOriginalIndex
+		SearchString = OriginalList(n)
+		If GetFindIndex(SearchString, SelStringList()) &lt;&gt; -1 Then
+			NewSourceList(m) =  SearchString
+			m = m + 1
+		ElseIf GetFindIndex(SearchString, SourceList()) &lt;&gt; -1 Then
+			NewSourceList(m) =  SearchString
+			m = m + 1
+		End If
+	Next n
+	if (m &gt; 0) then
+	  ReDim Preserve NewSourceList(m - 1)
+      FillListBox(lstSource, NewSourceList())
+	end if
+	List() = RemoveSelected(lstTarget)
+	FillListBox(lstTarget, List())
+  End If
+	SetNewSelection(lstSource, iOldSourceSelect)
+	SetNewSelection(lstTarget, iOldTargetSelect)
+
+End Sub
+
+
+Function RemoveSelected(AListBox as Object)
+Dim MaxIndex as Long
+Dim MaxSelected as Long
+Dim n as Long
+Dim m as Long
+Dim CurIndex as Long
+Dim CurItem as String
+Dim ResultArray() as String
+Dim LocItemList() as String
+Dim SelList() As Long
+
+  MaxIndex = AListBox.getItemCount() - 1
+  MaxSelected = Ubound(AListbox.getSelectedItems())
+	
+  LocItemList() = ListBoxToStringList(AListBox)
+  SelList() = AListBox.getSelectedItemsPos()
+	If MaxSelected &gt; -1 Then
+		For n = 0 To MaxSelected
+			CurIndex = SelList(n)
+			LocItemList(CurIndex) = &quot;&quot;
+		Next n
+		If MaxIndex &gt; 0 Then
+			ReDim ResultArray(MaxIndex - MaxSelected - 1)
+			m = 0
+			For n = 0 To MaxIndex
+				CurItem = LocItemList(n)
+				If CurItem &lt;&gt; &quot;&quot; Then
+					ResultArray(m) = CurItem
+					m = m + 1
+				End If
+			Next n	
+		End If
+		RemoveSelected = ResultArray()	
+	Else
+		RemoveSelected = ListBoxToStringList(AListBox)	
+	End If
+End Function
+
+
+Sub SetNewSelection(AListBox as Object, ALastSelection as Long)
+Dim MaxIndex as Long
+Dim SelIndex as Long
+  MaxIndex = AListBox.getItemCount() - 1
+  if MaxIndex &gt; -1  AND ALastSelection &gt; -1 Then
+    If ALastSelection &gt; MaxIndex Then
+	  SelIndex = MaxIndex
+	Else
+	  SelIndex = ALastSelection
+	End If
+    AListBox.selectItemPos(SelIndex, True)
+  End If
+End Sub
+
+
+Sub UnSelectAll(AListBox as Object)
+Dim MaxSelIndex, MaxIndex as Long
+Dim I as Long
+  MaxSelIndex = Ubound(AListbox.getSelectedItems())
+  if MaxSelIndex &gt; -1 then 
+    for I = 0 To MaxIndex
+     AListBox.selectItemPos(I, False)
+    next I
+  End If
+End Sub
+
+Sub SelectAll(AListBox as Object)
+Dim MaxIndex as Long
+Dim I as Long
+  MaxIndex = Ubound(AListbox.getItems())
+  if MaxIndex &gt; -1 then 
+    for I = 0 To MaxIndex
+      AListBox.selectItemPos(I, True)
+    next I
+  End If
+End Sub
+
+Sub ToggleListboxControls(ADlg As Object, ADoEnable As Boolean)
+  edtSkipRows.Enable = ADoEnable 
+  lstTableFields.Enable = ADoEnable
+  lstSelTableFields.Enable = ADoEnable
+  btnItemDown.Enable = ADoEnable
+  btnItemUp.Enable = ADoEnable
+  btnRemoveAllItems.Enable = ADoEnable
+  btnRemoveSingleItem.Enable = ADoEnable
+  btnMoveAllItems.Enable = ADoEnable
+  btnMoveSingleItem.Enable = ADoEnable
+
+  lstColumnNames.Enable = ADoEnable
+  lstSelColumnNames.Enable = ADoEnable
+  btnColumnDown.Enable = ADoEnable
+  btnColumnUp.Enable = ADoEnable
+  btnRemoveAllColumns.Enable = ADoEnable
+  btnRemoveSelColumns.Enable = ADoEnable
+  btnMoveAllColumns.Enable = ADoEnable
+  btnMoveSelColumns.Enable = ADoEnable
+  If ADoEnable Then
+	FormSetMoveRights()
+  End If
+End Sub	
+
+
+&apos; Enable or disable the buttons used for moving the available
+&apos; fields between the two list boxes.
+Sub FormSetMoveRights()
+Dim IsItemsSelected as Boolean
+Dim IsSelItemsSelected as Boolean
+Dim ItemsCount as Long
+Dim SelItemsCount as Long
+	
+	IsItemsSelected = Ubound(lstTableFields.getSelectedItems()) &lt;&gt; -1
+	ItemsCount = Ubound(lstTableFields.getItems()) + 1
+	IsSelItemsSelected = Ubound(lstSelTableFields.getSelectedItems()) &gt; -1
+	SelItemsCount = Ubound(lstSelTableFields.getItems()) + 1
+	
+	btnRemoveAllItems.Enable = SelItemsCount&gt;=1
+	btnRemoveSingleItem.Enable = IsSelItemsSelected
+	btnMoveAllItems.Enable = ItemsCount &gt;=1
+	btnMoveSingleItem.Enable = IsItemsSelected
+	btnItemDown.Enable = IsSelItemsSelected
+	btnItemUp.Enable = IsSelItemsSelected
+	
+	IsItemsSelected = Ubound(lstColumnNames.getSelectedItems()) &lt;&gt; -1
+	ItemsCount = Ubound(lstColumnNames.getItems()) + 1
+	IsSelItemsSelected = Ubound(lstSelColumnNames.getSelectedItems()) &gt; -1
+	SelItemsCount = Ubound(lstSelColumnNames.getItems()) + 1
+	
+	btnRemoveAllColumns.Enable = SelItemsCount&gt;=1
+	btnRemoveSelColumns.Enable = IsSelItemsSelected
+	btnMoveAllColumns.Enable = ItemsCount &gt;=1
+	btnMoveSelColumns.Enable = IsItemsSelected
+	btnColumnDown.Enable = IsSelItemsSelected
+	btnColumnUp.Enable = IsSelItemsSelected
+   
+    ToggleControlsByState(cbxUseRange.State)
+	&apos; This flag is set to &apos;1&apos; when the lstSelFields has been modified 
+End Sub
+
+
+Sub AddMultiItemsToListBox(AListBox as Object, AListItems() as String)
+Dim StartIndex, EndIndex, MaxIndex as Long
+Dim I, J as Long
+
+	StartIndex = Ubound(AListBox.getItems()) + 1
+	MaxIndex   = Ubound(AListItems())
+    EndIndex   = StartIndex + MaxIndex
+    J = 0
+    
+  if (MaxIndex &gt; -1) Then 
+    For I = StartIndex To EndIndex
+      AListBox.addItem(AListItems(J), I) 
+      J = J + 1
+    Next I
+  end if
+End Sub
+
+Function GetItemPos(oListBox as Object, sItem as String)
+Dim ItemList()
+Dim MaxIndex as Long
+Dim i as Long
+	ItemList() = oListBox.getItems()
+	MaxIndex = Ubound(ItemList())	
+	For i = 0 To MaxIndex
+		If sItem = ItemList(i) Then
+			GetItemPos() = i
+			Exit Function
+		End If
+	Next i
+	GetItemPos() = -1
+End Function
+
+Function GetCountItems(oListBox as Object, sItem as String)
+Dim ItemList()
+Dim MaxIndex as Long
+Dim Count, I as Long
+	ItemList() = oListBox.getItems()
+	MaxIndex = Ubound(ItemList())
+	Count = 0	
+	For I = 0 To MaxIndex
+		If sItem = ItemList(i) Then
+			Count = Count + 1
+		End If
+	Next i
+	GetCountItems() = Count
+End Function
+
+Sub GetObjectInfo(AObject As Object)
+  MsgBox AObject.dbg_methods
+  MsgBox AObject.dbg_supportedInterfaces 
+  MsgBox AObject.dbg_properties
+End Sub
+
+
+</script:module>

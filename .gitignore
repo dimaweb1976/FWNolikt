@@ -1,0 +1,8 @@
+# LibreOffice lock/temp files
+.~lock.*#
+*.tmp
+*.bak
+
+# Local Codex agent state
+.agents/
+.codex/

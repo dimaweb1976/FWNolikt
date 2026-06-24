@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">
+<dlg:window xmlns:dlg="http://openoffice.org/2000/dialog" xmlns:script="http://openoffice.org/2000/script" dlg:id="DlgTablesList" dlg:left="171" dlg:top="56" dlg:width="305" dlg:height="371" dlg:closeable="true" dlg:moveable="true">
+ <script:event script:event-name="on-keydown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.KeyPressed?language=Basic&amp;location=application" script:language="Script"/>
+ <dlg:bulletinboard>
+  <dlg:text dlg:id="lblSelectTable" dlg:tab-index="16" dlg:left="170" dlg:top="25" dlg:width="82" dlg:height="14" dlg:value="Выберите название таблицы"/>
+  <dlg:text dlg:id="lblTableFields" dlg:tab-index="26" dlg:left="170" dlg:top="59" dlg:width="85" dlg:height="12" dlg:value="Список полей"/>
+  <dlg:menulist dlg:id="lstTableFields" dlg:tab-index="17" dlg:left="170" dlg:top="71" dlg:width="85" dlg:height="70" dlg:multiselection="true">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.lstTableNamesOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:menulist>
+  <dlg:combobox dlg:id="cmbTableNames" dlg:tab-index="15" dlg:left="170" dlg:top="39" dlg:width="85" dlg:height="16" dlg:spin="true" dlg:linecount="25">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.cmbTableNamesOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:combobox>
+  <dlg:text dlg:id="lblSelTableFields" dlg:tab-index="27" dlg:left="171" dlg:top="165" dlg:width="84" dlg:height="12" dlg:value="Список выбраных полей"/>
+  <dlg:menulist dlg:id="lstSelTableFields" dlg:tab-index="22" dlg:left="171" dlg:top="176" dlg:width="85" dlg:height="70" dlg:multiselection="true">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.lstSelTableNamesOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:menulist>
+  <dlg:button dlg:id="btnItemDown" dlg:tab-index="23" dlg:left="174" dlg:top="246" dlg:width="19" dlg:height="14" dlg:value="▼">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnItemDownOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnItemUp" dlg:tab-index="24" dlg:left="236" dlg:top="246" dlg:width="19" dlg:height="14" dlg:value="▲">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnItemUpOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnMoveAllItems" dlg:tab-index="21" dlg:left="235" dlg:top="143" dlg:width="19" dlg:height="14" dlg:value="=&gt;&gt;">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnMoveAllItemsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnRemoveAllItems" dlg:tab-index="18" dlg:left="171" dlg:top="143" dlg:width="19" dlg:height="14" dlg:value="&lt;&lt;=">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnRemoveAllItemsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnMoveSingleItem" dlg:tab-index="20" dlg:left="213" dlg:top="143" dlg:width="19" dlg:height="14" dlg:value="-&gt;">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnMoveSingleItemsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnRemoveSingleItem" dlg:tab-index="19" dlg:left="192" dlg:top="143" dlg:width="19" dlg:height="14" dlg:value="&lt;-">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnRemoveSingleItemsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:text dlg:id="lblSelColumnNames" dlg:tab-index="29" dlg:left="37" dlg:top="163" dlg:width="84" dlg:height="12" dlg:value="Список выбраных колонок"/>
+  <dlg:text dlg:id="lblColumnNames" dlg:tab-index="28" dlg:left="37" dlg:top="61" dlg:width="85" dlg:height="12" dlg:value="Список колонок"/>
+  <dlg:menulist dlg:id="lstColumnNames" dlg:tab-index="3" dlg:left="37" dlg:top="73" dlg:width="85" dlg:height="70" dlg:multiselection="true">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.lstColumnNamesOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:menulist>
+  <dlg:menulist dlg:id="lstSelColumnNames" dlg:tab-index="8" dlg:left="37" dlg:top="174" dlg:width="85" dlg:height="70" dlg:multiselection="true">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.lstSelColumnNamesOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:menulist>
+  <dlg:button dlg:id="btnMoveAllColumns" dlg:tab-index="7" dlg:left="100" dlg:top="145" dlg:width="19" dlg:height="14" dlg:value="=&gt;&gt;">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnMoveAllColumnsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnMoveSelColumns" dlg:tab-index="6" dlg:left="80" dlg:top="145" dlg:width="19" dlg:height="14" dlg:value="-&gt;">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnMoveSelColumnsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnRemoveSelColumns" dlg:tab-index="5" dlg:left="58" dlg:top="145" dlg:width="19" dlg:height="14" dlg:value="&lt;-">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnRemoveSelColumnsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnRemoveAllColumns" dlg:tab-index="4" dlg:left="37" dlg:top="145" dlg:width="19" dlg:height="14" dlg:value="&lt;&lt;=">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnRemoveAllColumnsOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnColumnDown" dlg:tab-index="9" dlg:left="40" dlg:top="245" dlg:width="19" dlg:height="14" dlg:value="▼">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnColumnDownOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnColumnUp" dlg:tab-index="10" dlg:left="101" dlg:top="245" dlg:width="19" dlg:height="14" dlg:value="▲">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnColumnUpOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:titledbox dlg:id="pnlTables" dlg:tab-index="30" dlg:left="161" dlg:top="1" dlg:width="125" dlg:height="323"/>
+  <dlg:titledbox dlg:id="pnlSheets" dlg:tab-index="0" dlg:left="14" dlg:top="1" dlg:width="147" dlg:height="323"/>
+  <dlg:text dlg:id="lblSkipRows" dlg:tab-index="31" dlg:left="37" dlg:top="26" dlg:width="79" dlg:height="12" dlg:value="Указать строку заголовка"/>
+  <dlg:text dlg:id="lblText" dlg:tab-index="32" dlg:left="17" dlg:top="265" dlg:width="70" dlg:height="10" dlg:value="Указать значение"/>
+  <dlg:textfield dlg:id="edtText" dlg:tab-index="11" dlg:left="17" dlg:top="275" dlg:width="76" dlg:height="16"/>
+  <dlg:numericfield dlg:id="edtSkipRows" dlg:tab-index="2" dlg:left="37" dlg:top="39" dlg:width="82" dlg:height="18" dlg:strict-format="true" dlg:decimal-accuracy="0" dlg:value="0" dlg:value-min="0" dlg:value-max="65535" dlg:spin="true">
+   <script:event script:event-name="on-textchange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.edtSkipRowsOnChanged?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:numericfield>
+  <dlg:button dlg:id="btnImportToDB" dlg:tab-index="25" dlg:left="175" dlg:top="285" dlg:width="89" dlg:height="21" dlg:value="Импортировать данные в БД">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnImportToDBOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:text dlg:id="lblInfo" dlg:tab-index="34" dlg:left="16" dlg:top="326" dlg:width="268" dlg:height="8">
+   <script:event script:event-name="on-keydown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.KeyPressed?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:text>
+  <dlg:progressmeter dlg:id="pgsInfo" dlg:tab-index="35" dlg:left="19" dlg:top="336" dlg:width="264" dlg:height="11" dlg:value="0"/>
+  <dlg:titledbox dlg:id="pnlInfo" dlg:tab-index="33" dlg:left="14" dlg:top="325" dlg:width="272" dlg:height="25"/>
+  <dlg:button dlg:id="btnAddValue" dlg:tab-index="12" dlg:left="22" dlg:top="293" dlg:width="62" dlg:height="13" dlg:value="Добавить значение ▲" dlg:align="left">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnAddValueOnClick?language=Basic&amp;location=application" script:language="Script"/>
+   <script:event script:event-name="on-mouseup" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnAddValueOnReleased?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:text dlg:id="lblRange" dlg:tab-index="36" dlg:left="27" dlg:top="10" dlg:width="118" dlg:height="11" dlg:value="Использовать диапозон ячеек: "/>
+  <dlg:button dlg:id="btnPrev" dlg:tab-index="37" dlg:left="14" dlg:top="350" dlg:width="50" dlg:height="18" dlg:value="&lt;&lt; Предыдущий">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnPrevOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnNext" dlg:tab-index="38" dlg:left="67" dlg:top="350" dlg:width="50" dlg:height="18" dlg:value="Следующий &gt;&gt;">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnNextOnClick?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:checkbox dlg:id="cbxUseRange" dlg:tab-index="1" dlg:left="19" dlg:top="11" dlg:width="8" dlg:height="9" dlg:checked="false">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.cbxUseRangeOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:checkbox>
+  <dlg:button dlg:id="btnAddNull" dlg:tab-index="14" dlg:left="100" dlg:top="295" dlg:width="58" dlg:height="24" dlg:value="Добавить &quot;NULL&quot; ▲" dlg:align="left">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnAddNullOnClick?language=Basic&amp;location=application" script:language="Script"/>
+   <script:event script:event-name="on-mouseup" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnAddNullOnReleased?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="btnDelValue" dlg:tab-index="13" dlg:left="22" dlg:top="308" dlg:width="62" dlg:height="13" dlg:value="Удалить значение   ▼" dlg:align="left">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnDelValueOnClick?language=Basic&amp;location=application" script:language="Script"/>
+   <script:event script:event-name="on-mouseup" script:macro-name="vnd.sun.star.script:Import.IE_Manager.btnDelValueOnReleased?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:button>
+  <dlg:combobox dlg:id="cmbOperates" dlg:tab-index="39" dlg:left="170" dlg:top="11" dlg:width="85" dlg:height="12" dlg:page="1" dlg:spin="true">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.cmbOperatesOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:combobox>
+  <dlg:text dlg:id="lblOperates" dlg:tab-index="40" dlg:left="170" dlg:top="3" dlg:width="82" dlg:height="8" dlg:page="1" dlg:value="Выберите  операцию"/>
+  <dlg:combobox dlg:id="cmbColumns" dlg:tab-index="41" dlg:left="95" dlg:top="275" dlg:width="64" dlg:height="16" dlg:spin="true">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Import.IE_Manager.cmbColumnsOnChange?language=Basic&amp;location=application" script:language="Script"/>
+  </dlg:combobox>
+  <dlg:text dlg:id="lblColomn" dlg:tab-index="42" dlg:left="91" dlg:top="265" dlg:width="54" dlg:height="8" dlg:value="Выберите  колонку"/>
+ </dlg:bulletinboard>
+</dlg:window>

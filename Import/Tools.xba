@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Tools" script:language="StarBasic">REM  *****  BASIC  *****
+
+Sub Main
+End Sub
+
+Sub Disconnect_from_database (ADb as Object)
+  ADb.close
+  ADb.dispose()
+End Sub
+
+Function Connect_to_database (ADbName as String, ADbUser as String, ADbPass as String) as Object
+Dim DbContext, DataSource As Object
+  DbContext = createUnoService(&quot;com.sun.star.sdb.DatabaseContext&quot;)
+  Connect_to_database = DbContext.getByName(ADbName).getIsolatedConnection(ADbUser, ADbPass)
+End Function
+
+Function GetSelectedItem( AComboBox As Object ) As String
+  GetSelectedItem = AComboBox.Model.Text
+End Function
+
+
+Function GetFindIndex( AFindString As String, AStringList() As String ) As Long
+Dim FindIndex as Long, MaxIndex as Long
+  MaxIndex = Ubound(AStringList())
+  For FindIndex = 0 To MaxIndex
+    If AFindString = AStringList(FindIndex) Then 
+      Exit For
+    End if 
+  Next FindIndex 
+  If FindIndex &gt; MaxIndex Then 
+    FindIndex = -1
+  End if
+  GetFindIndex = FindIndex
+End Function
+
+Function GetDatabaseProductName(ADb As Object) As String
+Dim MetaData As Object
+  On Error GoTo ErrorHandle
+    MetaData = ADb.getMetaData()
+    GetDatabaseProductName = UCase(Trim(MetaData.getDatabaseProductName()))
+  Exit Function
+
+  ErrorHandle:
+    GetDatabaseProductName = &quot;&quot;
+End Function
+
+Function IsMySQLDatabase(ADb As Object) As Boolean
+Dim ProductName As String
+  ProductName = GetDatabaseProductName(ADb)
+  IsMySQLDatabase = (InStr(1, ProductName, &quot;MYSQL&quot;) &gt; 0) or (InStr(1, ProductName, &quot;MARIADB&quot;) &gt; 0)
+End Function
+
+Function SqlString(AValue As String) As String
+  SqlString = &quot;&apos;&quot; &amp; Replace(AValue, &quot;&apos;&quot;, &quot;&apos;&apos;&quot;) &amp; &quot;&apos;&quot;
+End Function
+
+Function QuoteMySQLIdentifier(AValue As String) As String
+  QuoteMySQLIdentifier = &quot;`&quot; &amp; Replace(AValue, &quot;`&quot;, &quot;``&quot;) &amp; &quot;`&quot;
+End Function
+
+
+Function GetProceduresNames(ADb As Object)
+  if IsMySQLDatabase(ADb) then
+    GetProceduresNames = GetMySQLRoutinesNames(ADb)
+  else
+    GetProceduresNames = GetFirebirdProceduresNames(ADb)
+  end if
+End Function
+
+Function GetFirebirdProceduresNames(ADb As Object)
+Dim ResultSet As Object
+Dim I As Long
+Dim SqlText As String
+Dim NullArray() As String, ResultArray(1000) As String
+  GetFirebirdProceduresNames = NullArray()
+  I = 0
+  SqlText = &quot;select RDB$PROCEDURES.RDB$PROCEDURE_NAME from RDB$PROCEDURES&quot; &amp; _
+            &quot; 	Order by RDB$PROCEDURES.RDB$PROCEDURE_NAME asc &quot;
+
+  ResultSet = QueryExecute(SqlText, _SelQuery)
+  If Not IsNull(ResultSet) Then
+    While ResultSet.next
+      ResultArray(I) = Trim(ResultSet.getString(1))
+      I = I + 1
+    Wend
+    If (I &gt; 0) Then
+      ReDim Preserve ResultArray(I - 1)
+      GetFirebirdProceduresNames = ResultArray()
+    end if
+  End If  
+End Function
+
+Function GetMySQLRoutinesNames(ADb As Object)
+Dim ResultSet As Object
+Dim I As Long
+Dim SqlText As String
+Dim NullArray() As String, ResultArray(1000) As String
+  GetMySQLRoutinesNames = NullArray()
+  I = 0
+  SqlText = &quot;select ROUTINE_NAME from INFORMATION_SCHEMA.ROUTINES &quot; &amp; _
+            &quot;where ROUTINE_SCHEMA = DATABASE() &quot; &amp; _
+            &quot;and ROUTINE_TYPE in (&apos;PROCEDURE&apos;, &apos;FUNCTION&apos;) &quot; &amp; _
+            &quot;order by ROUTINE_NAME asc &quot;
+
+  ResultSet = QueryExecute(SqlText, _SelQuery)
+  If Not IsNull(ResultSet) Then
+    While ResultSet.next
+      ResultArray(I) = Trim(ResultSet.getString(1))
+      I = I + 1
+    Wend
+    If (I &gt; 0) Then
+      ReDim Preserve ResultArray(I - 1)
+      GetMySQLRoutinesNames = ResultArray()
+    end if
+  End If
+End Function
+
+Function GetProceduresParams(ADb As Object, AProcedureName As String, AParamsType As Integer)
+  if IsMySQLDatabase(ADb) then
+    GetProceduresParams = GetMySQLRoutineParams(ADb, AProcedureName, AParamsType)
+  else
+    GetProceduresParams = GetFirebirdProceduresParams(ADb, AProcedureName, AParamsType)
+  end if
+End Function
+
+Function GetFirebirdProceduresParams(ADb As Object, AProcedureName As String, AParamsType As Integer)
+Dim ResultSet As Object
+Dim I As Long
+Dim SqlText As String
+Dim NullArray() As String, ResultArray(1000) As String
+  GetFirebirdProceduresParams = NullArray()
+  I = 0
+  if (AProcedureName = &quot;&quot;) then
+    exit Function
+  end if  
+  SqlText = &quot;select RDB$PROCEDURE_PARAMETERS.RDB$PARAMETER_NAME from RDB$PROCEDURE_PARAMETERS &quot; &amp; _
+            &quot;where RDB$PROCEDURE_PARAMETERS.RDB$PROCEDURE_NAME = &apos;&quot; &amp; Trim(AProcedureName) &amp; &quot;&apos;&quot; &amp; _
+            &quot; and RDB$PROCEDURE_PARAMETERS.RDB$PARAMETER_TYPE = &quot; &amp; CStr(AParamsType) &amp; _
+            &quot; Order by RDB$PROCEDURE_PARAMETERS.RDB$PARAMETER_NUMBER asc &quot;
+  ResultSet = QueryExecute(SqlText, _SelQuery)
+  If Not IsNull(ResultSet) Then
+    While ResultSet.next
+      ResultArray(I) = Trim(ResultSet.getString(1))
+      if (AParamsType = _Input) then 
+        ResultArray(I) = &quot;in:&quot; &amp; ResultArray(I)
+      elseif (AParamsType = _Output) then 
+        ResultArray(I) = &quot;out:&quot; &amp; ResultArray(I)       
+      end if
+      I = I + 1
+    Wend
+    If (I &gt; 0) Then
+      ReDim Preserve ResultArray(I - 1)
+      GetFirebirdProceduresParams = ResultArray()
+    end if
+  End If  
+End Function
+
+Function GetMySQLRoutineType(AProcedureName As String) As String
+Dim ResultSet As Object
+Dim SqlText As String
+  GetMySQLRoutineType = &quot;&quot;
+  if (AProcedureName = &quot;&quot;) then
+    exit Function
+  end if
+
+  SqlText = &quot;select ROUTINE_TYPE from INFORMATION_SCHEMA.ROUTINES &quot; &amp; _
+            &quot;where ROUTINE_SCHEMA = DATABASE() &quot; &amp; _
+            &quot;and ROUTINE_NAME = &quot; &amp; SqlString(AProcedureName) &amp; _
+            &quot; order by ROUTINE_TYPE asc &quot;
+  ResultSet = QueryExecute(SqlText, _SelQuery)
+  If Not IsNull(ResultSet) Then
+    if ResultSet.next then
+      GetMySQLRoutineType = UCase(Trim(ResultSet.getString(1)))
+    end if
+  End If
+End Function
+
+Function IsMySQLFunction(AProcedureName As String) As Boolean
+  IsMySQLFunction = (GetMySQLRoutineType(AProcedureName) = &quot;FUNCTION&quot;)
+End Function
+
+Function GetMySQLRoutineParams(ADb As Object, AProcedureName As String, AParamsType As Integer)
+Dim ResultSet As Object
+Dim I As Long
+Dim SqlText As String
+Dim ParamName As String
+Dim ParamMode As String
+Dim NullArray() As String, ResultArray(1000) As String
+  GetMySQLRoutineParams = NullArray()
+  I = 0
+  if (AProcedureName = &quot;&quot;) then
+    exit Function
+  end if
+
+  if IsMySQLFunction(AProcedureName) and (AParamsType = _Output) then
+    ReDim ResultArray(0) As String
+    ResultArray(0) = &quot;out:&quot; &amp; AProcedureName
+    GetMySQLRoutineParams = ResultArray()
+    exit Function
+  end if
+
+  SqlText = &quot;select PARAMETER_NAME, coalesce(PARAMETER_MODE, &apos;IN&apos;) from INFORMATION_SCHEMA.PARAMETERS &quot; &amp; _
+            &quot;where SPECIFIC_SCHEMA = DATABASE() &quot; &amp; _
+            &quot;and SPECIFIC_NAME = &quot; &amp; SqlString(AProcedureName) &amp; _
+            &quot; and ORDINAL_POSITION &gt; 0 &quot; &amp; _
+            &quot;order by ORDINAL_POSITION asc &quot;
+  ResultSet = QueryExecute(SqlText, _SelQuery)
+  If Not IsNull(ResultSet) Then
+    While ResultSet.next
+      ParamName = Trim(ResultSet.getString(1))
+      ParamMode = UCase(Trim(ResultSet.getString(2)))
+      if (ParamName &lt;&gt; &quot;&quot;) then
+        if ((AParamsType = _Input) and ((ParamMode = &quot;IN&quot;) or (ParamMode = &quot;INOUT&quot;))) then
+          ResultArray(I) = &quot;in:&quot; &amp; ParamName
+          I = I + 1
+        elseif ((AParamsType = _Output) and ((ParamMode = &quot;OUT&quot;) or (ParamMode = &quot;INOUT&quot;))) then
+          ResultArray(I) = &quot;out:&quot; &amp; ParamName
+          I = I + 1
+        end if
+      end if
+    Wend
+    If (I &gt; 0) Then
+      ReDim Preserve ResultArray(I - 1)
+      GetMySQLRoutineParams = ResultArray()
+    end if
+  End If
+End Function
+
+Function GetParamTypeStr(AParamsType As Integer)
+  if (AParamsType = _Input) then 
+    GetParamTypeStr = &quot;in:&quot;
+  elseif (AParamsType = _Output) then 
+    GetParamTypeStr = &quot;out:&quot;
+  end if
+End Function
+
+Function GetParamsArrayByType(AParams() As String, AParamsType As Integer, Optional APrefix As Boolean)
+  Dim ResultStr As String
+  Dim StartPos As Long
+  Dim CurrentPos As Long
+  Dim I, Count, MaxIndex as Long
+  Dim NullArray() As String, ResultArray(150) As String
+  
+  if IsMissing(APrefix) then
+    APrefix = true
+  end if
+   
+  MaxIndex = Ubound(AParams())
+  if (MaxIndex = -1) Then
+    GetParamsArrayByType = NullArray()
+    Exit Function 
+  End if 
+  
+  StartPos = 1
+  Count = 0
+  For I = 0 To MaxIndex
+    ResultStr = &quot;&quot;
+    CurrentPos = InStr(StartPos, AParams(I), GetParamTypeStr(AParamsType))
+      If CurrentPos &lt;&gt; 0 Then
+        ResultStr = AParams(I)
+        if (not APrefix) then 
+          ResultStr = Mid(ResultStr, CurrentPos + Len(GetParamTypeStr(AParamsType)), Len(AParams(I)))
+        end if
+        ResultArray(Count) = ResultStr
+        Count = Count + 1
+      End If               
+  Next I
+
+  if (Count &gt; 0) then 
+    ReDim Preserve ResultArray(Count - 1)
+  else
+    GetParamsArrayByType = NullArray()
+    Exit Function 
+  end if  
+  GetParamsArrayByType = ResultArray()
+End Function
+
+Function GetLastIndexParamsArrayByType(AParams() As String, AParamsType As Integer)
+  Dim StartPos As Long
+  Dim CurrentPos As Long
+  Dim I, ParamPos, MaxIndex as Long
+  
+  ParamPos = -1
+  GetLastIndexParamsArrayByType = ParamPos
+  MaxIndex = Ubound(AParams())
+  
+  if (MaxIndex = -1) Then
+    Exit Function 
+  End if 
+  
+  StartPos = 1
+  For I = 0 To MaxIndex
+    CurrentPos = InStr(StartPos, AParams(I), GetParamTypeStr(AParamsType))
+      If CurrentPos &lt;&gt; 0 Then
+        ParamPos = I
+      End If               
+  Next I
+
+  if (ParamPos &gt;= 0) then 
+    GetLastIndexParamsArrayByType = ParamPos
+  end if  
+End Function
+
+Function GetFirstIndexParamsArrayByType(AParams() As String, AParamsType As Integer)
+  Dim StartPos As Long
+  Dim CurrentPos As Long
+  Dim I, ParamPos, MaxIndex as Long
+  
+  ParamPos = -1
+  GetFirstIndexParamsArrayByType = ParamPos
+  MaxIndex = Ubound(AParams())
+  
+  if (MaxIndex = -1) Then
+    Exit Function 
+  End if 
+  
+  StartPos = 1
+  For I = 0 To MaxIndex
+    CurrentPos = InStr(StartPos, AParams(I), GetParamTypeStr(AParamsType))
+      If CurrentPos &lt;&gt; 0 Then
+        ParamPos = I
+        exit for
+      End If               
+  Next I
+
+  if (ParamPos &gt;= 0) then 
+    GetFirstIndexParamsArrayByType = ParamPos
+  end if  
+End Function
+
+Function IsParamByType(AParams() As String, APos As Integer, AParamsType As Integer)
+  Dim StartPos As Long
+  Dim CurrentPos As Long
+  Dim MaxIndex as Long
+
+  IsParamByType = False
+  MaxIndex = Ubound(AParams())
+  if (MaxIndex = -1) and (APos &gt; MaxIndex) Then
+    Exit Function 
+  End if 
+  
+  StartPos = 1
+  CurrentPos = InStr(StartPos, AParams(APos), GetParamTypeStr(AParamsType))
+    If CurrentPos &lt;&gt; 0 Then
+      IsParamByType = True
+    End If               
+End Function
+
+Function sql_select(ATable As String, AFields() As String) As String
+  sql_select() = &quot;&quot;
+  if ((ATable &lt;&gt; &quot;&quot;) and (Ubound(AFields()) &gt; -1) and (AValues &lt;&gt; &quot;&quot;)) then
+    sql_select() = &quot;Select  &quot; &amp; join(AFields, &quot;,&quot;) &amp; &quot; from &quot; &amp; ATable
+  end if
+End Function
+
+Function sql_delete(ATable As String) As String
+  sql_sdelete() = &quot;&quot;
+  if (ATable &lt;&gt; &quot;&quot;) then
+    sql_delete() = &quot;Delete from &quot; &amp; ATable
+  end if
+End Function
+
+Function sql_insert(ATable As String, AFields() As String, AValues As String) As String
+  sql_insert() = &quot;&quot;
+  if ((ATable &lt;&gt; &quot;&quot;) and (Ubound(AFields()) &gt; -1) and (AValues &lt;&gt; &quot;&quot;)) then
+    sql_insert() = &quot;Insert into &quot; &amp; ATable &amp; &quot; (&quot; &amp; join(AFields, &quot;,&quot;) &amp; &quot;)&quot; &amp; &quot; Values &quot; &amp; &quot;(&quot; &amp; AValues &amp; &quot;)&quot;
+  end if
+End Function
+
+Function sql_update(ATable As String, AFields() As String, AValues As String) As String
+  Dim I , MaxIndex,  StartPos, EndPos, CurrPos As Integer
+  Dim Result, SubStr As String
+  sql_update() = &quot;&quot;
+  StartPos = 1
+  if ((ATable &lt;&gt; &quot;&quot;) and (Ubound(AFields()) &gt; -1) and (AValues &lt;&gt; &quot;&quot;)) then
+    Result = &quot;Update &quot; &amp; ATable &amp; &quot; &quot;
+    MaxIndex = Ubound(AFields())
+    for  I = 0 to MaxIndex 
+      CurrPos = InStr(StartPos, AValues, &quot;,&quot;)
+      if (CurrPos = 0) then
+        CurrPos = Len(AValues) + 2
+      end if
+      SubStr  = Mid(AValues, StartPos, CurrPos - StartPos - 1)
+      StartPos = CurrPos + 1   
+      Result = Result &amp; &quot; Set &quot; &amp; AFields(I) &amp; &quot; = &quot; &amp; SubStr 
+    next I 
+  sql_update() = Result
+  end if
+End Function
+
+Function sql_procedure(AProcedure As String, AOutParams() As String, AValues As String) As String
+Dim SqlText As String
+  SqlText = &quot;&quot;
+  if (AProcedure &lt;&gt; &quot;&quot;) then
+    
+    if (AOutParams(0) &lt;&gt; &quot;&quot;) then
+      SqlText = &quot;select &quot; &amp; join(AOutParams(), &quot;,&quot;) &amp;  &quot; from &quot; &amp; AProcedure
+    else
+      SqlText = &quot;execute procedure &quot; &amp; AProcedure
+    end if 
+
+    if (AValues &lt;&gt; &quot;&quot;) then
+      SqlText = SqlText &amp; &quot;(&quot; &amp; AValues &amp; &quot;)&quot;
+    else
+   end if 
+  end if
+  sql_procedure() =  SqlText
+End Function
+
+Function sql_routine(ADb As Object, AProcedure As String, AAllParams() As String, AOutParams() As String, AValues As String) As String
+  if IsMySQLDatabase(ADb) then
+    sql_routine() = sql_mysql_routine(AProcedure, AAllParams(), AOutParams(), AValues)
+  else
+    sql_routine() = sql_procedure(AProcedure, AOutParams(), AValues)
+  end if
+End Function
+
+Function sql_mysql_routine(AProcedure As String, AAllParams() As String, AOutParams() As String, AValues As String) As String
+  if IsMySQLFunction(AProcedure) then
+    sql_mysql_routine() = sql_mysql_function(AProcedure, AOutParams(), AValues)
+  else
+    sql_mysql_routine() = sql_mysql_procedure(AProcedure, AAllParams(), AOutParams(), AValues)
+  end if
+End Function
+
+Function sql_mysql_function(AFunction As String, AOutParams() As String, AValues As String) As String
+Dim ResultAlias As String
+  ResultAlias = AFunction
+  if (Ubound(AOutParams()) &gt; -1) and (AOutParams(0) &lt;&gt; &quot;&quot;) then
+    ResultAlias = AOutParams(0)
+  end if
+  sql_mysql_function() = &quot;select &quot; &amp; QuoteMySQLIdentifier(AFunction) &amp; &quot;(&quot; &amp; AValues &amp; &quot;) as &quot; &amp; QuoteMySQLIdentifier(ResultAlias)
+End Function
+
+Function sql_mysql_procedure(AProcedure As String, AAllParams() As String, AOutParams() As String, AValues As String) As String
+Dim ResultSet As Object
+Dim SqlText As String
+Dim Args As String
+Dim SelectText As String
+Dim InitText As String
+Dim ParamName As String
+Dim ParamMode As String
+Dim ArgValue As String
+Dim OutVar As String
+Dim Values() As String
+Dim ValueIndex As Long
+Dim OutIndex As Long
+Dim MaxValueIndex As Long
+
+  Args = &quot;&quot;
+  SelectText = &quot;&quot;
+  InitText = &quot;&quot;
+  ValueIndex = 0
+  OutIndex = 0
+  Values() = Split(AValues, &quot;,&quot;)
+  MaxValueIndex = Ubound(Values())
+
+  SqlText = &quot;select PARAMETER_NAME, coalesce(PARAMETER_MODE, &apos;IN&apos;) from INFORMATION_SCHEMA.PARAMETERS &quot; &amp; _
+            &quot;where SPECIFIC_SCHEMA = DATABASE() &quot; &amp; _
+            &quot;and SPECIFIC_NAME = &quot; &amp; SqlString(AProcedure) &amp; _
+            &quot; and ORDINAL_POSITION &gt; 0 &quot; &amp; _
+            &quot;order by ORDINAL_POSITION asc &quot;
+
+  ResultSet = QueryExecute(SqlText, _SelQuery)
+  If Not IsNull(ResultSet) Then
+    While ResultSet.next
+      ParamName = Trim(ResultSet.getString(1))
+      ParamMode = UCase(Trim(ResultSet.getString(2)))
+      if (Args &lt;&gt; &quot;&quot;) then
+        Args = Args &amp; &quot;,&quot;
+      end if
+
+      if ((ParamMode = &quot;OUT&quot;) or (ParamMode = &quot;INOUT&quot;)) then
+        OutVar = &quot;@__lo_mysql_out_&quot; &amp; CStr(OutIndex)
+        if (ParamMode = &quot;INOUT&quot;) then
+          ArgValue = &quot;NULL&quot;
+          if (ValueIndex &lt;= MaxValueIndex) then
+            ArgValue = Values(ValueIndex)
+            ValueIndex = ValueIndex + 1
+          end if
+          InitText = InitText &amp; &quot;|set &quot; &amp; OutVar &amp; &quot; = &quot; &amp; ArgValue
+        end if
+        Args = Args &amp; OutVar
+        if (SelectText &lt;&gt; &quot;&quot;) then
+          SelectText = SelectText &amp; &quot;,&quot;
+        end if
+        SelectText = SelectText &amp; OutVar &amp; &quot; as &quot; &amp; QuoteMySQLIdentifier(ParamName)
+        OutIndex = OutIndex + 1
+      else
+        ArgValue = &quot;NULL&quot;
+        if (ValueIndex &lt;= MaxValueIndex) then
+          ArgValue = Values(ValueIndex)
+          ValueIndex = ValueIndex + 1
+        end if
+        Args = Args &amp; ArgValue
+      end if
+    Wend
+  End If
+
+  if (SelectText &lt;&gt; &quot;&quot;) then
+    sql_mysql_procedure() = &quot;MYSQL_OUT_CALL&quot; &amp; InitText &amp; &quot;|call &quot; &amp; QuoteMySQLIdentifier(AProcedure) &amp; &quot;(&quot; &amp; Args &amp; &quot;)|select &quot; &amp; SelectText
+  else
+    sql_mysql_procedure() = &quot;call &quot; &amp; QuoteMySQLIdentifier(AProcedure) &amp; &quot;(&quot; &amp; AValues &amp; &quot;)&quot;
+  end if
+End Function
+
+Function QueryExecute(ASqlText As String, AQueryType As Long) As Object
+Dim ResultSet As Object
+Dim Commands() As String
+Dim I As Long
+Dim MaxIndex As Long
+
+  if (ASqlText &lt;&gt; &quot;&quot;) then
+    if (Left(ASqlText, Len(&quot;MYSQL_OUT_CALL|&quot;)) = &quot;MYSQL_OUT_CALL|&quot;) then
+      Commands() = Split(ASqlText, &quot;|&quot;)
+      MaxIndex = Ubound(Commands())
+      if (MaxIndex &gt; 1) then
+        For I = 1 To MaxIndex - 1
+          if (Commands(I) &lt;&gt; &quot;&quot;) then
+            Statement.executeUpdate(Commands(I))
+          end if
+        Next I
+        ResultSet = Statement.executeQuery(Commands(MaxIndex))
+      end if
+    elseif (AQueryType = _SelQuery) then
+      ResultSet = Statement.executeQuery(ASqlText)
+    else
+      Statement.executeUpdate(ASqlText)
+    end if  
+  end if
+  QueryExecute() = ResultSet
+End Function
+
+
+Function SimpleSheetSearch(ASearchStr, ARange) As Variant
+  Dim Descriptor
+  Dim Found
+
+  Descriptor = ARange.createSearchDescriptor()
+  With Descriptor
+    .SearchString = ASearchStr
+    .SearchType = 1
+    .SearchRegularExpression = 1
+    .SearchCaseSensitive = False
+  End With
+  Found = ARange.findFirst(Descriptor)
+  SimpleSheetSearch = Found
+End Function
+
+Function Replace(Source As String, Search As String, NewPart As String)
+  Dim Result As String
+  Dim StartPos As Long
+  Dim CurrentPos As Long
+ 
+  Result = &quot;&quot;
+  StartPos = 1
+  CurrentPos = 1
+ 
+  If Search = &quot;&quot; Then
+    Result = Source
+  Else 
+    Do While CurrentPos &lt;&gt; 0
+      CurrentPos = InStr(StartPos, Source, Search)
+      If CurrentPos &lt;&gt; 0 Then
+        Result = Result + Mid(Source, StartPos, _
+        CurrentPos - StartPos)
+        Result = Result + NewPart
+        StartPos = CurrentPos + Len(Search)
+      Else
+        Result = Result + Mid(Source, StartPos, Len(Source))
+      End If                &apos; Position &lt;&gt; 0
+    Loop 
+  End If 
+ 
+  Replace = Result
+End Function
+
+REM Sub KeyPressed(Event As Object)
+REM Dim Msg As String
+  REM Select Case Event.KeyCode
+  REM Case com.sun.star.awt.Key.RETURN
+    REM Msg = &quot;Return pressed&quot;
+  REM Case com.sun.star.awt.Key.TAB
+    REM Msg = &quot;Tab pressed&quot;
+  REM Case com.sun.star.awt.Key.DELETE
+    REM Msg = &quot;Delete pressed&quot;
+  REM Case com.sun.star.awt.Key.ESCAPE
+    REM Msg = &quot;Escape pressed&quot;
+  REM Case com.sun.star.awt.Key.DOWN
+    REM Msg = &quot;Down pressed&quot;
+  REM Case com.sun.star.awt.Key.UP
+    REM Msg = &quot;Up pressed&quot;
+  REM Case com.sun.star.awt.Key.LEFT
+    REM Msg = &quot;Left pressed&quot;
+  REM Case com.sun.star.awt.Key.RIGHT
+    REM Msg = &quot;Right pressed&quot;
+  REM Case Else
+    REM Msg = &quot;Character &quot; &amp; Event.KeyChar &amp; &quot; entered&quot;
+  REM End Select
+  REM MsgBox Msg
+REM End Sub
+</script:module>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="UserCredintials" script:language="StarBasic">REM  *****  BASIC  *****
+Dim cmbDB As Object
+
+Sub Main
+End Sub
+
+Sub cmbDBOnChange
+  DataBaseName = GetSelectedItem(cmbDB)
+End Sub
+
+Function InitializeDlgUserCredintials(UserCredintials() As String)
+    LoadLibrary(&quot;Import&quot;)
+    
+    DlgUserCredintials = CreateUnoDialog(DialogLibraries.Import.DlgUserCredintials)      
+    
+    cmbDB = DlgUserCredintials.getControl(&quot;cmbDB&quot;)
+    cmbDB.addItem(&quot;&quot;, 0) 
+    cmbDB.addItem(&quot;db_eur&quot;, 1) 
+    cmbDB.addItem(&quot;db_2013&quot;, 2) 
+    cmbDB.addItem(&quot;skladb&quot;, 3) 
+   
+    DlgUserCredintials.getControl(&quot;edtUser&quot;).Text     = UserCredintials(0)
+    DlgUserCredintials.getControl(&quot;edtPass&quot;).Text     = UserCredintials(1)
+
+    DbContext = createUnoService(&quot;com.sun.star.sdb.DatabaseContext&quot;)
+
+    if DbContext.hasByName(UserCredintials(2)) Then
+      DlgUserCredintials.getControl(&quot;cmbDB&quot;).Model.Text = UserCredintials(2)   
+      On Error GoTo DefaultError
+      Db = connect_to_database(DataBaseName, UserCredintials(0), UserCredintials(1))
+      GoTo Continue
+    Else
+      DlgUserCredintials.getControl(&quot;cmbDB&quot;).Model.Text = &quot;&quot;   
+    End If 
+    
+   DefaultError:    
+   InitializeDlgUserCredintials = DlgUserCredintials.execute()
+   
+   Continue:
+   DataBaseName = DlgUserCredintials.getControl(&quot;cmbDB&quot;).Model.Text
+   
+   If InitializeDlgUserCredintials Then
+     UserCredintials(0) = DlgUserCredintials.getControl(&quot;edtUser&quot;).Text 
+     UserCredintials(1) = DlgUserCredintials.getControl(&quot;edtPass&quot;).Text   
+     UserCredintials(2) = DlgUserCredintials.getControl(&quot;cmbDB&quot;).Model.Text   
+    
+     If DlgUserCredintials.getControl(&quot;chbSaveCredintials&quot;).State Then
+        SaveUserCredintialsToSheet(UserCredintials(0), UserCredintials(1), UserCredintials(2))
+     End If
+   End If
+    
+End Function
+
+Sub SaveUserCredintialsToSheet(UserName As String, Password As String, DB As String)
+Dim oSheet
+  oSheet = ThisComponent.getSheets().getByIndex(0)
+  oSheet.GetCellByPosition(0, 0).String = UserName
+  oSheet.GetCellByPosition(0, 1).String = Password
+  oSheet.GetCellByPosition(0, 2).String = DB
+End Sub
+</script:module>
