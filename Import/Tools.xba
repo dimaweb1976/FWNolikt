@@ -48,8 +48,20 @@ End Function
 
 Function IsMySQLDatabase(ADb As Object) As Boolean
 Dim ProductName As String
+Dim ResultSet As Object
   ProductName = GetDatabaseProductName(ADb)
   IsMySQLDatabase = (InStr(1, ProductName, &quot;MYSQL&quot;) &gt; 0) or (InStr(1, ProductName, &quot;MARIADB&quot;) &gt; 0)
+  if IsMySQLDatabase then
+    exit Function
+  end if
+
+  On Error GoTo ErrorHandle
+    ResultSet = Statement.executeQuery(&quot;select database()&quot;)
+    IsMySQLDatabase = Not IsNull(ResultSet)
+  Exit Function
+
+  ErrorHandle:
+    IsMySQLDatabase = False
 End Function
 
 Function SqlString(AValue As String) As String
