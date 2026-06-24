@@ -6,3 +6,10 @@
 # Local Codex agent state
 .agents/
 .codex/
+
+# Local MySQL test runtime
+mysql-*.zip
+mysql-server/
+mysql-*-winx64/
+mysql-data/
+mysql-logs/

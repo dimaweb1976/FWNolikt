@@ -20,6 +20,7 @@ Function InitializeDlgUserCredintials(UserCredintials() As String)
     cmbDB.addItem(&quot;db_eur&quot;, 1) 
     cmbDB.addItem(&quot;db_2013&quot;, 2) 
     cmbDB.addItem(&quot;skladb&quot;, 3) 
+    cmbDB.addItem(&quot;fwnolikt_demo&quot;, 4) 
    
     DlgUserCredintials.getControl(&quot;edtUser&quot;).Text     = UserCredintials(0)
     DlgUserCredintials.getControl(&quot;edtPass&quot;).Text     = UserCredintials(1)
