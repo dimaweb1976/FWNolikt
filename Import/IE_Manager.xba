@@ -608,6 +608,7 @@ Dim NullArray() As String
     Operate   = &quot;INSERT&quot;
     ParamTypeStr = GetParamTypeStr(_Input)
     TableNames() = GetTableNames(Db)
+    Tablename = ResolveTableName(Db, Tablename)
     FillComboBox(cmbTableNames, Tablenames())
     FillComboBox(cmbOperates, Operates())
     cmbTableNames.Model.Text = Tablename
@@ -653,14 +654,69 @@ Function GetTableNames(ADb As Object)
   GetTableNames = ADb.Tables.ElementNames()
 End Function
 
+Function GetShortDbObjectName(AName As String) As String
+Dim StartPos As Long
+Dim DotPos As Long
+  GetShortDbObjectName = Trim(AName)
+  StartPos = 1
+  DotPos = InStr(StartPos, GetShortDbObjectName, &quot;.&quot;)
+  While DotPos &lt;&gt; 0
+    GetShortDbObjectName = Mid(GetShortDbObjectName, DotPos + 1, Len(GetShortDbObjectName) - DotPos)
+    StartPos = 1
+    DotPos = InStr(StartPos, GetShortDbObjectName, &quot;.&quot;)
+  Wend
+End Function
+
+Function ResolveTableName(ADb As Object, ATableName As String) As String
+Dim I, MaxIndex As Long
+Dim TableNames() As String
+Dim RequestedName As String
+Dim CurrentName As String
+
+  ResolveTableName = ATableName
+  RequestedName = UCase(Trim(ATableName))
+  if (RequestedName = &quot;&quot;) then
+    exit Function
+  end if
+
+  TableNames() = ADb.Tables.ElementNames()
+  MaxIndex = Ubound(TableNames())
+  For I = 0 To MaxIndex
+    CurrentName = Trim(TableNames(I))
+    if (CurrentName = ATableName) then
+      ResolveTableName = CurrentName
+      exit Function
+    end if
+  Next I
+
+  For I = 0 To MaxIndex
+    CurrentName = Trim(TableNames(I))
+    if (UCase(CurrentName) = RequestedName) then
+      ResolveTableName = CurrentName
+      exit Function
+    end if
+  Next I
+
+  For I = 0 To MaxIndex
+    CurrentName = Trim(TableNames(I))
+    if (UCase(GetShortDbObjectName(CurrentName)) = RequestedName) then
+      ResolveTableName = CurrentName
+      exit Function
+    end if
+  Next I
+End Function
+
 Function GetFieldNames(ADb As Object, ATableName As String)
 Dim I, MaxIndex As Integer
 Dim NullArray() As String
+Dim ResolvedTableName As String
   if (ParamTypeStr = &quot;&quot;) then
     GetFieldNames = NullArray()
     exit Function
   end if
-  Columns = ADb.Tables.GetByName(ATablename).Columns
+  ResolvedTableName = ResolveTableName(ADb, ATableName)
+  Tablename = ResolvedTableName
+  Columns = ADb.Tables.GetByName(ResolvedTableName).Columns
   FieldNames() = Columns.GetElementNames()
   MaxIndex = Ubound(FieldNames())
   For I = 0 To MaxIndex
